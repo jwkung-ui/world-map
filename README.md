@@ -47,11 +47,12 @@ python3 -m http.server 8000   # then visit http://localhost:8000
    branch **main**, folder **/ (root)**, then **Save**.
 3. Your site goes live at `https://<your-username>.github.io/<repo-name>/` within a minute.
 
-## Data & licensing
+## Data sources
 
 World Bank Open Data is CC BY 4.0. Natural Earth is public domain. This is an independent
 project and is not affiliated with or endorsed by the World Bank.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+© 2026 JK. All rights reserved. This code is published for demonstration only; it may not be
+copied, modified, redistributed, or used commercially without permission.
