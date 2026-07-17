@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no"/>
+  <title>World Map — Economic &amp; Demographic Explorer</title>
+  <meta name="description" content="Scroll a live world map to see any country's economy, markets, and society — GDP, income, markets, debt, population, energy and more — with world / regional / income-group benchmarks and trends. Free World Bank data."/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="World Map — Economic &amp; Demographic Explorer"/>
+  <meta property="og:description" content="Hover any country for its economy, markets and society at a glance, with benchmarks vs the world, its region and its income group. Live, free World Bank data."/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="World Map — Economic &amp; Demographic Explorer"/>
+  <meta name="twitter:description" content="Hover any country for its economy, markets and society at a glance. Live World Bank data with world/regional/income benchmarks."/>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#111a33; --text:#e8eefc; --muted:#a9b4d6;
+      --brand:#7c5cff; --brand2:#19c37d; --border: rgba(255,255,255,.10);
+      --shadow: 0 12px 40px rgba(0,0,0,.35); --radius:16px;
+    }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html,body{ height:100%; }
+    body{ margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(124,92,255,.35), transparent 60%),
+                  radial-gradient(1000px 500px at 90% 0%, rgba(25,195,125,.22), transparent 55%), var(--bg);
+      color:var(--text); -webkit-text-size-adjust:100%; }
+    .wrap{ max-width:1280px; margin:0 auto; padding:18px 14px 44px; }
+    header{ display:flex; gap:14px; align-items:flex-start; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; }
+    .title h1{ margin:0 0 6px; font-size:19px; letter-spacing:.2px; }
+    .title p{ margin:0; color:var(--muted); line-height:1.4; max-width:820px; font-size:13px; }
+    .pillbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .pill{ background: rgba(255,255,255,.06); border:1px solid var(--border); border-radius:14px; padding:7px 10px; display:flex; gap:8px; align-items:center; }
+    .pill label{ color:var(--muted); font-size:11.5px; white-space:nowrap; }
+    select{ appearance:none; border-radius:10px; border:1px solid var(--border); background: rgba(0,0,0,.28); color:var(--text); padding:8px 28px 8px 10px; min-width:120px; outline:none; cursor:pointer; font-size:13.5px;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a9b4d6' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
+      background-repeat:no-repeat; background-position: right 8px center; }
+    .grid{ display:grid; grid-template-columns: 1.35fr .65fr; gap:14px; margin-top:12px; }
+    @media (max-width: 1000px){ .grid{ grid-template-columns:1fr; } header{ flex-direction:column; } }
+    .card{ background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03)); border:1px solid var(--border); border-radius:var(--radius); box-shadow: var(--shadow); overflow:hidden; }
+    .card .hd{ padding:12px 14px 10px; display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid rgba(255,255,255,.07); background: rgba(0,0,0,.08); }
+    .card .hd h2{ margin:0; font-size:14px; letter-spacing:.3px; }
+    .submuted{ color:var(--muted); font-size:12px; margin:2px 0 0; line-height:1.25; }
+    .card .bd{ padding:13px; }
+    .badge{ font-size:11.5px; color: var(--text); border:1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); border-radius:999px; padding:5px 9px; white-space:nowrap; }
+
+    #mapHolder{ position:relative; width:100%; height:min(62vh,560px); background:
+        radial-gradient(700px 280px at 20% 15%, rgba(124,92,255,.16), transparent 55%),
+        radial-gradient(600px 260px at 82% 45%, rgba(25,195,125,.14), transparent 60%), rgba(0,0,0,.14);
+      border-radius:12px; border:1px solid rgba(255,255,255,.07); overflow:hidden; }
+    @media (max-width: 1000px){ #mapHolder{ height:min(56vh,460px); } }
+    svg#map{ width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
+    svg#map.grabbing{ cursor:grabbing; }
+    .country{ stroke: rgba(11,16,32,.75); stroke-width:.3px; vector-effect: non-scaling-stroke; transition: fill .18s ease; cursor:pointer; }
+    .country:hover{ stroke:#fff; stroke-width:1px; }
+    .cmarker{ transition: fill .18s ease; }
+    .cmarker:hover{ stroke:#fff !important; }
+    .country.selected{ stroke:#fff; stroke-width:1.5px; }
+    .graticule{ fill:none; stroke: rgba(255,255,255,.05); stroke-width:.5px; }
+    .sphere{ fill: rgba(255,255,255,.02); stroke: rgba(255,255,255,.08); stroke-width:1px; }
+
+    .tooltip{ position:absolute; pointer-events:none; opacity:0; transform: translate(-50%, calc(-100% - 12px)); transition: opacity .1s ease; background: rgba(6,10,22,.94); border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:8px 10px; z-index:6; max-width:240px; box-shadow:0 8px 26px rgba(0,0,0,.5); }
+    .tooltip .t1{ font-weight:800; font-size:13px; }
+    .tooltip .t2{ margin-top:3px; color:var(--muted); font-size:12px; line-height:1.3; }
+    .tooltip .t2 b{ color:var(--text); }
+
+    .map-overlay{ position:absolute; left:12px; right:12px; bottom:10px; display:flex; gap:10px; align-items:flex-end; justify-content:space-between; pointer-events:none; }
+    .legend{ background: rgba(6,10,22,.6); border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:8px 10px; backdrop-filter: blur(6px); pointer-events:none; }
+    .legend .lg-title{ font-size:11px; color:var(--muted); margin-bottom:6px; }
+    .legend .bar{ width:min(44vw,190px); height:10px; border-radius:6px; border:1px solid rgba(255,255,255,.15); }
+    .legend .ticks{ display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px; gap:6px; }
+    .legend .nodata{ display:flex; align-items:center; gap:6px; margin-top:6px; font-size:10.5px; color:var(--muted); }
+    .legend .nodata .sw{ width:11px; height:11px; border-radius:3px; background:#2a3350; border:1px solid rgba(255,255,255,.15); }
+    .zoomcol{ display:flex; flex-direction:column; gap:6px; pointer-events:auto; align-items:flex-end; }
+    .zbtn{ width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.14); background:rgba(6,10,22,.6); color:var(--text); font-size:18px; line-height:1; cursor:pointer; backdrop-filter: blur(6px); display:flex;align-items:center;justify-content:center; }
+    .zbtn.small{ font-size:11px; height:auto; width:auto; padding:6px 9px; }
+
+    .loading{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; background: rgba(6,10,22,.6); z-index:7; color:var(--muted); font-size:13px; }
+    .loading.hide{ display:none; }
+    .spinner{ width:26px; height:26px; border-radius:50%; border:3px solid rgba(255,255,255,.15); border-top-color: var(--brand); animation: spin 1s linear infinite; }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+    .miniload{ position:absolute; top:10px; left:12px; background:rgba(6,10,22,.7); border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:5px 11px; font-size:11.5px; color:var(--muted); z-index:6; display:none; align-items:center; gap:7px; }
+    .miniload.show{ display:flex; }
+    .miniload .spinner{ width:13px; height:13px; border-width:2px; }
+    .errbox{ display:none; position:absolute; inset:auto 12px 12px 12px; background:rgba(120,20,40,.4); border:1px solid rgba(255,120,140,.4); color:#ffd7de; border-radius:12px; padding:9px 11px; font-size:12px; z-index:8; }
+    .errbox.show{ display:block; }
+
+    .metrics{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    @media (max-width: 460px){ .metrics{ grid-template-columns:1fr; } }
+    .metric{ background: rgba(0,0,0,.16); border:1px solid rgba(255,255,255,.09); border-radius:12px; padding:9px 10px; position:relative; overflow:hidden; }
+    .metric.active{ border-color: rgba(124,92,255,.6); box-shadow: 0 0 0 1px rgba(124,92,255,.35) inset; }
+    .metric .k{ color:var(--muted); font-size:11.5px; margin:0; line-height:1.2; }
+    .metric .v{ margin-top:5px; font-size:16px; letter-spacing:.2px; font-weight:750; }
+    .metric .hint{ margin-top:4px; color:var(--muted); font-size:11px; line-height:1.25; }
+    .spark{ margin-top:8px; height:40px; position:relative; }
+    .spark svg{ display:block; width:100%; height:40px; overflow:visible; }
+    .spark .sparklabel{ position:absolute; top:-2px; right:0; font-size:10px; color:var(--muted); pointer-events:none; background:rgba(6,10,22,.7); border-radius:5px; padding:1px 4px; opacity:0; transition:opacity .1s; }
+    .trendbox{ margin-top:12px; background: rgba(0,0,0,.12); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:10px 12px; }
+    .trendhd{ font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .trendbox .spark{ height:52px; margin-top:0; } .trendbox .spark svg{ height:52px; }
+    .compbox{ margin-top:12px; background: rgba(0,0,0,.12); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:12px; }
+    .comphd{ font-size:13px; font-weight:750; margin-bottom:8px; }
+    .compsub{ font-size:11px; color:var(--muted); margin:0 0 5px; }
+    .stackbar{ display:flex; height:16px; border-radius:6px; overflow:hidden; border:1px solid rgba(255,255,255,.12); }
+    .stackbar span{ height:100%; }
+    .stacklegend{ display:flex; flex-wrap:wrap; gap:10px; margin-top:6px; font-size:11px; color:var(--muted); }
+    .stacklegend i{ display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; vertical-align:middle; }
+    .dembar{ display:grid; grid-template-columns:120px 1fr 42px; align-items:center; gap:8px; margin-top:5px; font-size:11px; }
+    .dembar .deml{ color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .dembar .demtrack{ height:8px; background:rgba(255,255,255,.08); border-radius:4px; overflow:hidden; }
+    .dembar .demfill{ display:block; height:100%; border-radius:4px; }
+    .dembar .demv{ text-align:right; font-weight:600; }
+    .metric .src{ margin-top:4px; color:var(--muted); font-size:9.5px; opacity:.72; line-height:1.2; word-break:break-all; }
+    .metric .bench{ margin-top:3px; font-size:10px; line-height:1.25; color:#9fb4d6; }
+    .metric .bench b{ color:#cfe0ff; font-weight:650; }
+    .benchbar{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:2px 0 10px; }
+    .benchbar .benchlbl{ font-size:11px; color:var(--muted); margin-right:2px; }
+    .benchbtn{ font:inherit; font-size:11px; padding:3px 9px; border-radius:20px; cursor:pointer;
+      background:rgba(255,255,255,.05); color:var(--muted); border:1px solid rgba(255,255,255,.14); }
+    .benchbtn:hover{ color:var(--text); }
+    .benchbtn.on{ background:rgba(84,214,160,.16); color:#cfe0ff; border-color:rgba(84,214,160,.55); font-weight:600; }
+    .benchkey{ display:flex; align-items:center; gap:3px; margin-top:2px; font-size:9px; color:var(--muted); }
+    .benchkey .sk{ display:inline-block; width:10px; height:0; border-top-width:2px; border-top-style:solid; }
+    .benchkey .sk-c{ border-top-color:#54d6a0; }
+    .benchkey .sk-b{ border-top-color:#f2b25c; border-top-style:dashed; }
+    .csrc{ margin-top:9px; color:var(--muted); font-size:10px; opacity:.8; line-height:1.35; }
+    .leaderbox{ margin-top:12px; background: rgba(0,0,0,.12); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:12px; }
+    .ldtl{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .ldchip{ display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:3px 8px; border:1px solid rgba(255,255,255,.14); border-radius:20px; color:var(--muted); }
+    .ldchip.on{ color:var(--text); background:rgba(255,255,255,.06); font-weight:650; }
+    .ldchip i{ width:8px; height:8px; border-radius:50%; }
+    .ldchip em{ font-style:normal; opacity:.7; font-size:10px; }
+    .list{ margin-top:12px; background: rgba(0,0,0,.12); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:12px; }
+    .list .title{ display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .list .title h3{ margin:0; font-size:13px; letter-spacing:.2px; }
+    .kv{ display:grid; grid-template-columns:1fr auto; gap:8px 12px; align-items:center; padding:6px 0; border-top:1px dashed rgba(255,255,255,.10); }
+    .kv:first-child{ border-top:none; padding-top:0; }
+    .kv span{ color:var(--muted); font-size:11.5px; }
+    .kv b{ font-size:11.5px; text-align:right; }
+    .empty{ color:var(--muted); font-size:13px; line-height:1.5; padding:8px 2px; }
+    .flag{ font-size:22px; line-height:1; }
+    .note{ margin-top:12px; color:var(--muted); font-size:11.5px; line-height:1.4; }
+    footer{ margin-top:14px; color: rgba(255,255,255,.5); font-size:11.5px; line-height:1.4; text-align:center; }
+    a{ color:#b9a8ff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <h1>🌍 World Map — Economic &amp; Demographic Explorer</h1>
+        <p>Tap or hover a country for a quick read; select it to pin its full snapshot with history. Choose the map metric, your currency, and the year. Figures are the latest official values from the <b>World Bank</b>, fetched live.</p>
+      </div>
+      <div class="pillbar">
+        <div class="pill"><label for="country">Find country</label>
+          <select id="country"><option value="">Jump to a country…</option></select>
+        </div>
+        <div class="pill"><label for="metric">Metric</label>
+          <select id="metric">
+            <optgroup label="Economic">
+              <option value="gdp">GDP per capita (PPP)</option>
+              <option value="income">Average income (GNI/cap, PPP)</option>
+              <option value="gdp_growth">GDP growth</option>
+              <option value="inflation">Inflation (CPI)</option>
+              <option value="unemployment">Unemployment</option>
+              <option value="interest">Real interest rate</option>
+              <option value="debt">Govt debt / GDP</option>
+              <option value="hh_cons_pc">Household spending / person</option>
+            </optgroup>
+            <optgroup label="Markets &amp; finance">
+              <option value="mktcap">Stock market cap / GDP</option>
+              <option value="traded">Stocks traded / GDP</option>
+              <option value="npl">Non-performing loans</option>
+            </optgroup>
+            <optgroup label="Demographic &amp; social">
+              <option value="pop" selected>Population</option>
+              <option value="pop_growth">Population growth</option>
+              <option value="urban">Urbanization rate</option>
+              <option value="dep_ratio">Age dependency ratio</option>
+              <option value="gini">Income inequality (Gini)</option>
+              <option value="life">Life expectancy</option>
+              <option value="fertility">Fertility rate</option>
+              <option value="internet">Internet users</option>
+            </optgroup>
+            <optgroup label="Energy &amp; environment">
+              <option value="elec_pc">Electricity use / person</option>
+              <option value="elec_access">Electricity access</option>
+              <option value="co2">CO₂ per capita</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="pill"><label for="currency">Currency</label>
+          <select id="currency"><option value="USD" selected>USD $</option></select>
+        </div>
+        <div class="pill"><label for="year">Year</label>
+          <select id="year"><option value="latest" selected>Latest</option></select>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div class="hd">
+          <div><h2>Interactive world map</h2>
+            <p class="submuted" id="mapSub">Colour shows population. Pinch/scroll to zoom, drag to pan.</p></div>
+          <div class="badge" id="coverageBadge">—</div>
+        </div>
+        <div class="bd">
+          <div id="mapHolder">
+            <svg id="map" aria-label="World map"></svg>
+            <div class="tooltip" id="tooltip"><div class="t1" id="ttCountry">Country</div><div class="t2" id="ttValue">Value</div></div>
+            <div class="miniload" id="miniload"><div class="spinner"></div><span id="miniloadMsg">Loading…</span></div>
+            <div class="map-overlay">
+              <div class="legend">
+                <div class="lg-title" id="legendTitle">Population</div>
+                <div class="bar" id="legendBar"></div>
+                <div class="ticks"><span id="legLo">–</span><span id="legMid">–</span><span id="legHi">–</span></div>
+                <div class="nodata"><span class="sw"></span> No data</div>
+              </div>
+              <div class="zoomcol">
+                <button class="zbtn" id="zin" aria-label="Zoom in">+</button>
+                <button class="zbtn" id="zout" aria-label="Zoom out">−</button>
+                <button class="zbtn small" id="zreset">Reset</button>
+              </div>
+            </div>
+            <div class="loading" id="loading"><div class="spinner"></div><div id="loadingMsg">Loading map &amp; live data…</div></div>
+            <div class="errbox" id="errbox"></div>
+          </div>
+          <div class="note" id="mapNote">Data: World Bank Open Data · shapes: Natural Earth (world-atlas). Currency converted from international/US dollars at live market rates.</div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="hd">
+          <div><h2>Country details</h2><p class="submuted" id="countrySubtitle">Tap a country to see its details.</p></div>
+          <div class="badge" id="selectedCountryBadge">—</div>
+        </div>
+        <div class="bd">
+          <div id="detailBody">
+            <div class="empty" id="emptyState">👆 Tap a country (or use “Find country”) to see its full snapshot — GDP, income, growth, inflation, unemployment, debt, population, life expectancy and more — plus a trend chart for the selected metric.</div>
+            <div id="detailFilled" style="display:none;">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div class="flag" id="detailFlag">🏳️</div>
+                <div><div style="font-weight:750;font-size:16px;" id="detailName">Country</div><div class="submuted"><span id="detailRegion">—</span><span id="detailCapital"></span></div></div>
+              </div>
+              <div class="benchbar" id="benchBar">
+                <span class="benchlbl">Benchmark vs</span>
+                <button type="button" class="benchbtn on" data-g="world">World</button>
+                <button type="button" class="benchbtn" data-g="region">Region</button>
+                <button type="button" class="benchbtn" data-g="income">Income group</button>
+              </div>
+              <div class="metrics" id="metricsGrid"></div>
+              <div class="compbox" id="compBox" style="display:none"></div>
+              <div class="compbox" id="ageBox" style="display:none"></div>
+              <div class="leaderbox" id="leaderBox" style="display:none"></div>
+              <div class="list">
+                <div class="title"><h3>Data notes</h3><span class="badge">World Bank</span></div>
+                <div class="kv"><span>Showing</span><b id="noteShowing">Latest</b></div>
+                <div class="kv"><span>Reference years</span><b id="noteYears">—</b></div>
+                <div class="kv"><span>Currency</span><b id="noteCurrency">USD</b></div>
+                <div class="kv"><span>ISO code</span><b id="noteIso">—</b></div>
+              </div>
+              <div class="note">Each tile shows the latest World Bank value (year shown) with a mini trend and its exact source indicator code, so you always know where a number comes from. Hover a trend to read any year. Metrics confirmed to have no data for a country are hidden (others show “loading…” until fetched). “Average income” = GNI per capita (PPP); money converts from international/US dollars at current market rates. Govt debt has thin coverage (e.g. China is missing — that needs IMF data, coming with the multi-source update). For the US, a party-coloured head-of-state timeline is shown, and hovering a trend also labels each year with the president &amp; party. Top-5 export/import products and sub-industry breakdowns need product-level trade data (Harvard Atlas / OEC), which arrives with the multi-source snapshot. <b>Benchmark:</b> each tile shows where the country stands versus a reference — its percentile and how it compares to the population-weighted average (the “typical person”), switchable between World, its region, and its World Bank income group. On each trend, the dashed orange line is that reference through time, so you can see a country converging toward or pulling away from it. Reference trend lines load progressively and are cached.</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <footer>Live World Bank data · switch metric, currency &amp; year · click any country for its history.</footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+  <script>
+  (function(){
+    "use strict";
+
+    const METRICS = {
+      pop:        { label:"Population",            wb:"SP.POP.TOTL",        unit:"people",      money:false, scale:"log",    fmt:fmtPeople, agg:"sum" },
+      gdp:        { label:"GDP per capita (PPP)",  wb:"NY.GDP.PCAP.PP.CD",  unit:"per capita",  money:true,  scale:"log",    fmt:fmtMoney  },
+      income:     { label:"Average income (GNI/cap, PPP)", wb:"NY.GNP.PCAP.PP.CD", unit:"per capita", money:true, scale:"log", fmt:fmtMoney },
+      gdp_growth: { label:"GDP growth",            wb:"NY.GDP.MKTP.KD.ZG",  unit:"% per year",     money:false, scale:"linear", fmt:fmtPct },
+      inflation:  { label:"Inflation (CPI)",       wb:"FP.CPI.TOTL.ZG",     unit:"% per year",     money:false, scale:"linear", fmt:fmtPct },
+      unemployment:{label:"Unemployment",          wb:"SL.UEM.TOTL.ZS",     unit:"% labour force", money:false, scale:"linear", fmt:fmtPct },
+      interest:   { label:"Real interest rate",    wb:"FR.INR.RINR",        unit:"%",              money:false, scale:"linear", fmt:fmtPct },
+      debt:       { label:"Govt debt / GDP",       wb:"GC.DOD.TOTL.GD.ZS",  unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      life:       { label:"Life expectancy",       wb:"SP.DYN.LE00.IN",     unit:"years",       money:false, scale:"linear", fmt:fmtYears  },
+      pop_growth: { label:"Population growth",      wb:"SP.POP.GROW",        unit:"% per year",     money:false, scale:"linear", fmt:fmtPct },
+      fertility:  { label:"Fertility rate",        wb:"SP.DYN.TFRT.IN",     unit:"births/woman",   money:false, scale:"linear", fmt:fmtNum },
+      internet:   { label:"Internet users",        wb:"IT.NET.USER.ZS",     unit:"% of population",money:false, scale:"linear", fmt:fmtPct },
+      co2:        { label:"CO₂ per capita",        wb:"EN.GHG.CO2.PC.CE.AR5", unit:"t per person", money:false, scale:"linear", fmt:fmtNum },
+      elec_pc:    { label:"Electricity use / person", wb:"EG.USE.ELEC.KH.PC", unit:"kWh/person",     money:false, scale:"log",    fmt:fmtKwh },
+      elec_access:{ label:"Electricity access",    wb:"EG.ELC.ACCS.ZS",      unit:"% of population",money:false, scale:"linear", fmt:fmtPct },
+      // markets & finance
+      mktcap:     { label:"Stock market cap / GDP", wb:"CM.MKT.LCAP.GD.ZS",  unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      traded:     { label:"Stocks traded / GDP",   wb:"CM.MKT.TRAD.GD.ZS",   unit:"% of GDP · annual",money:false,scale:"linear", fmt:fmtPct },
+      npl:        { label:"Non-performing loans",  wb:"FB.AST.NPER.ZS",      unit:"% of gross loans",money:false, scale:"linear", fmt:fmtPct },
+      // more demographic & social
+      hh_cons_pc: { label:"Household spending / person", wb:"NE.CON.PRVT.PC.KD", unit:"const 2015 US$", money:false, scale:"log", fmt:fmtUSD0 },
+      urban:      { label:"Urbanization rate",     wb:"SP.URB.TOTL.IN.ZS",   unit:"% urban",        money:false, scale:"linear", fmt:fmtPct },
+      dep_ratio:  { label:"Age dependency ratio",  wb:"SP.POP.DPND",         unit:"% of working-age",money:false, scale:"linear", fmt:fmtPct },
+      gini:       { label:"Income inequality (Gini)", wb:"SI.POV.GINI",      unit:"index 0–100",    money:false, scale:"linear", fmt:fmtNum },
+      // hidden — age-structure view
+      a_014: {label:"Ages 0–14", wb:"SP.POP.0014.TO.ZS",unit:"% of population",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      a_1564:{label:"Ages 15–64",wb:"SP.POP.1564.TO.ZS",unit:"% of population",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      a_65:  {label:"Ages 65+",  wb:"SP.POP.65UP.TO.ZS",unit:"% of population",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      // hidden — loaded only to build the GDP composition view
+      c_agri:{label:"Agriculture",wb:"NV.AGR.TOTL.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      c_ind: {label:"Industry",   wb:"NV.IND.TOTL.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      c_srv: {label:"Services",   wb:"NV.SRV.TOTL.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      c_cons:{label:"Household consumption",wb:"NE.CON.PRVT.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      c_gov: {label:"Government",  wb:"NE.CON.GOVT.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      c_inv: {label:"Investment",  wb:"NE.GDI.TOTL.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      c_exp: {label:"Exports",     wb:"NE.EXP.GNFS.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
+      c_imp: {label:"Imports",     wb:"NE.IMP.GNFS.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true}
+    };
+    const METRIC_ORDER = ["gdp","income","gdp_growth","inflation","unemployment","interest","debt","hh_cons_pc","mktcap","traded","npl","pop","pop_growth","urban","dep_ratio","gini","life","fertility","internet","co2","elec_pc","elec_access"];
+    const COMP = { sector:[["c_agri","Agriculture","#19c37d"],["c_ind","Industry","#7c5cff"],["c_srv","Services","#ffd166"]],
+                   demand:[["c_cons","Household consumption","#7c5cff"],["c_inv","Investment","#19c37d"],["c_gov","Government","#ffd166"],["c_exp","Exports","#4aa3ff"],["c_imp","Imports","#ff8c6b"]] };
+    const AGE = [["a_014","0–14","#4aa3ff"],["a_1564","15–64","#19c37d"],["a_65","65+","#ffd166"]];
+    const COMP_KEYS = ["c_agri","c_ind","c_srv","c_cons","c_gov","c_inv","c_exp","c_imp","a_014","a_1564","a_65"];
+    const LOAD_KEYS = METRIC_ORDER.concat(COMP_KEYS);
+    // US presidents by year + party (extensible per-country leader overlay)
+    const US_LEADERS = [[1953,1961,"Eisenhower","R"],[1961,1963,"Kennedy","D"],[1963,1969,"L. Johnson","D"],[1969,1974,"Nixon","R"],[1974,1977,"Ford","R"],[1977,1981,"Carter","D"],[1981,1989,"Reagan","R"],[1989,1993,"G.H.W. Bush","R"],[1993,2001,"Clinton","D"],[2001,2009,"G.W. Bush","R"],[2009,2017,"Obama","D"],[2017,2021,"Trump","R"],[2021,2025,"Biden","D"],[2025,2100,"Trump","R"]];
+    function usLeader(y){ for(const L of US_LEADERS){ if(y>=L[0] && y<L[1]) return L[2]+" ("+L[3]+")"; } return null; }
+    // Capital cities by ISO3 (stable reference data)
+    const CAPITALS = {
+      USA:"Washington, D.C.",CHN:"Beijing",IND:"New Delhi",JPN:"Tokyo",DEU:"Berlin",GBR:"London",FRA:"Paris",ITA:"Rome",
+      CAN:"Ottawa",BRA:"Brasília",RUS:"Moscow",KOR:"Seoul",AUS:"Canberra",ESP:"Madrid",MEX:"Mexico City",IDN:"Jakarta",
+      NLD:"Amsterdam",SAU:"Riyadh",TUR:"Ankara",CHE:"Bern",POL:"Warsaw",SWE:"Stockholm",BEL:"Brussels",ARG:"Buenos Aires",
+      THA:"Bangkok",IRL:"Dublin",AUT:"Vienna",NGA:"Abuja",ISR:"Jerusalem",NOR:"Oslo",ARE:"Abu Dhabi",EGY:"Cairo",
+      ZAF:"Pretoria",DNK:"Copenhagen",SGP:"Singapore",MYS:"Kuala Lumpur",PHL:"Manila",HKG:"Hong Kong",VNM:"Hanoi",
+      BGD:"Dhaka",PAK:"Islamabad",CHL:"Santiago",COL:"Bogotá",FIN:"Helsinki",ROU:"Bucharest",CZE:"Prague",PRT:"Lisbon",
+      NZL:"Wellington",GRC:"Athens",PER:"Lima",IRQ:"Baghdad",DZA:"Algiers",QAT:"Doha",KAZ:"Astana",HUN:"Budapest",
+      KWT:"Kuwait City",MAR:"Rabat",UKR:"Kyiv",ECU:"Quito",SVK:"Bratislava",KEN:"Nairobi",ETH:"Addis Ababa",AGO:"Luanda",
+      OMN:"Muscat",MMR:"Naypyidaw",LKA:"Colombo",GHA:"Accra",TZA:"Dodoma",TKM:"Ashgabat",LUX:"Luxembourg",BGR:"Sofia",
+      HRV:"Zagreb",CIV:"Yamoussoukro",LTU:"Vilnius",UZB:"Tashkent",SVN:"Ljubljana",TUN:"Tunis",BLR:"Minsk",AZE:"Baku",
+      JOR:"Amman",BOL:"Sucre",CRI:"San José",PRY:"Asunción",URY:"Montevideo",PAN:"Panama City",LBN:"Beirut",
+      CMR:"Yaoundé",UGA:"Kampala",BHR:"Manama",LVA:"Riga",EST:"Tallinn",NPL:"Kathmandu",SLV:"San Salvador",
+      HND:"Tegucigalpa",PNG:"Port Moresby",ISL:"Reykjavík",SEN:"Dakar",ZMB:"Lusaka",ZWE:"Harare",GTM:"Guatemala City",
+      KHM:"Phnom Penh",TTO:"Port of Spain",CYP:"Nicosia",AFG:"Kabul",GEO:"Tbilisi",BIH:"Sarajevo",GAB:"Libreville",
+      MOZ:"Maputo",MLI:"Bamako",BFA:"Ouagadougou",BWA:"Gaborone",NAM:"Windhoek",MDG:"Antananarivo",MWI:"Lilongwe",
+      RWA:"Kigali",BEN:"Porto-Novo",NER:"Niamey",TCD:"N'Djamena",MRT:"Nouakchott",COG:"Brazzaville",COD:"Kinshasa",
+      SDN:"Khartoum",SOM:"Mogadishu",LBY:"Tripoli",SSD:"Juba",YEM:"Sana'a",SYR:"Damascus",MNG:"Ulaanbaatar",
+      LAO:"Vientiane",BRN:"Bandar Seri Begawan",MAC:"Macau",FJI:"Suva",MDA:"Chișinău",ALB:"Tirana",MKD:"Skopje",
+      SRB:"Belgrade",MNE:"Podgorica",ARM:"Yerevan",KGZ:"Bishkek",TJK:"Dushanbe",MLT:"Valletta",JAM:"Kingston",
+      DOM:"Santo Domingo",CUB:"Havana",NIC:"Managua",HTI:"Port-au-Prince",VEN:"Caracas",GUY:"Georgetown",SUR:"Paramaribo",
+      BHS:"Nassau",BLZ:"Belmopan",GMB:"Banjul",GNB:"Bissau",GIN:"Conakry",SLE:"Freetown",LBR:"Monrovia",TGO:"Lomé",
+      ERI:"Asmara",DJI:"Djibouti",BDI:"Gitega",LSO:"Maseru",SWZ:"Mbabane",CAF:"Bangui",GNQ:"Malabo",CPV:"Praia",
+      COM:"Moroni",STP:"São Tomé",SYC:"Victoria",MUS:"Port Louis",MDV:"Malé",BTN:"Thimphu",BRB:"Bridgetown",
+      TLS:"Dili",VUT:"Port Vila",WSM:"Apia",TON:"Nuku'alofa",KIR:"Tarawa",FSM:"Palikir",MHL:"Majuro",PLW:"Ngerulmud",
+      NRU:"Yaren",TUV:"Funafuti",AND:"Andorra la Vella",LIE:"Vaduz",MCO:"Monaco",SMR:"San Marino",PSE:"Ramallah",
+      XKX:"Pristina",GRL:"Nuuk",PRK:"Pyongyang"
+    };
+    const SEQ = t => d3.interpolateViridis(t);
+    const SPARK_COLOR = "#54d6a0";
+
+    // Curated currency list (only those present in live rates are kept)
+    const CURRENCIES = [
+      ["USD","$","US Dollar"],["EUR","€","Euro"],["GBP","£","British Pound"],["JPY","¥","Japanese Yen"],
+      ["CNY","¥","Chinese Yuan"],["INR","₹","Indian Rupee"],["HKD","HK$","Hong Kong Dollar"],["AUD","A$","Australian Dollar"],
+      ["CAD","C$","Canadian Dollar"],["CHF","CHF ","Swiss Franc"],["SGD","S$","Singapore Dollar"],["KRW","₩","South Korean Won"],
+      ["BRL","R$","Brazilian Real"],["MXN","MX$","Mexican Peso"],["ZAR","R","South African Rand"],["RUB","₽","Russian Ruble"],
+      ["TRY","₺","Turkish Lira"],["SEK","kr ","Swedish Krona"],["NOK","kr ","Norwegian Krone"],["NZD","NZ$","New Zealand Dollar"],
+      ["AED","AED ","UAE Dirham"],["SAR","SAR ","Saudi Riyal"],["THB","฿","Thai Baht"],["IDR","Rp ","Indonesian Rupiah"],
+      ["MYR","RM ","Malaysian Ringgit"],["PHP","₱","Philippine Peso"],["PLN","zł ","Polish Zloty"],["DKK","kr ","Danish Krone"],
+      ["TWD","NT$","Taiwan Dollar"],["NGN","₦","Nigerian Naira"],["EGP","E£","Egyptian Pound"],["VND","₫","Vietnamese Dong"]
+    ];
+
+    // ISO 3166-1 numeric -> alpha-3 (integer-string keys)
+    const NUM2A3 = {"4":"AFG","8":"ALB","12":"DZA","20":"AND","24":"AGO","28":"ATG","32":"ARG","51":"ARM","36":"AUS","40":"AUT","31":"AZE","44":"BHS","48":"BHR","50":"BGD","52":"BRB","112":"BLR","56":"BEL","84":"BLZ","204":"BEN","64":"BTN","68":"BOL","70":"BIH","72":"BWA","76":"BRA","96":"BRN","100":"BGR","854":"BFA","108":"BDI","116":"KHM","120":"CMR","124":"CAN","132":"CPV","140":"CAF","148":"TCD","152":"CHL","156":"CHN","170":"COL","174":"COM","178":"COG","180":"COD","188":"CRI","384":"CIV","191":"HRV","192":"CUB","196":"CYP","203":"CZE","208":"DNK","262":"DJI","212":"DMA","214":"DOM","218":"ECU","818":"EGY","222":"SLV","226":"GNQ","232":"ERI","233":"EST","748":"SWZ","231":"ETH","242":"FJI","246":"FIN","250":"FRA","266":"GAB","270":"GMB","268":"GEO","276":"DEU","288":"GHA","300":"GRC","308":"GRD","320":"GTM","324":"GIN","624":"GNB","328":"GUY","332":"HTI","340":"HND","348":"HUN","352":"ISL","356":"IND","360":"IDN","364":"IRN","368":"IRQ","372":"IRL","376":"ISR","380":"ITA","388":"JAM","392":"JPN","400":"JOR","398":"KAZ","404":"KEN","296":"KIR","408":"PRK","410":"KOR","414":"KWT","417":"KGZ","418":"LAO","428":"LVA","422":"LBN","426":"LSO","430":"LBR","434":"LBY","438":"LIE","440":"LTU","442":"LUX","450":"MDG","454":"MWI","458":"MYS","462":"MDV","466":"MLI","470":"MLT","584":"MHL","478":"MRT","480":"MUS","484":"MEX","583":"FSM","498":"MDA","492":"MCO","496":"MNG","499":"MNE","504":"MAR","508":"MOZ","104":"MMR","516":"NAM","520":"NRU","524":"NPL","528":"NLD","554":"NZL","558":"NIC","562":"NER","566":"NGA","807":"MKD","578":"NOR","512":"OMN","586":"PAK","585":"PLW","591":"PAN","598":"PNG","600":"PRY","604":"PER","608":"PHL","616":"POL","620":"PRT","634":"QAT","642":"ROU","643":"RUS","646":"RWA","659":"KNA","662":"LCA","670":"VCT","882":"WSM","674":"SMR","678":"STP","682":"SAU","686":"SEN","688":"SRB","690":"SYC","694":"SLE","702":"SGP","703":"SVK","705":"SVN","90":"SLB","706":"SOM","710":"ZAF","728":"SSD","724":"ESP","144":"LKA","729":"SDN","740":"SUR","752":"SWE","756":"CHE","760":"SYR","158":"TWN","762":"TJK","834":"TZA","764":"THA","626":"TLS","768":"TGO","776":"TON","780":"TTO","788":"TUN","792":"TUR","795":"TKM","798":"TUV","800":"UGA","804":"UKR","784":"ARE","826":"GBR","840":"USA","858":"URY","860":"UZB","548":"VUT","862":"VEN","704":"VNM","887":"YEM","894":"ZMB","716":"ZWE","275":"PSE","732":"ESH","304":"GRL","630":"PRI","238":"FLK","540":"NCL","260":"ATF","10":"ATA","344":"HKG","446":"MAC"};
+    const A3META = {AFG:["S. Asia","AF"],ALB:["Europe","AL"],DZA:["MENA","DZ"],AND:["Europe","AD"],AGO:["Sub-Saharan Africa","AO"],ATG:["Latin America","AG"],ARG:["Latin America","AR"],ARM:["Europe & C. Asia","AM"],AUS:["East Asia & Pacific","AU"],AUT:["Europe","AT"],AZE:["Europe & C. Asia","AZ"],BHS:["Latin America","BS"],BHR:["MENA","BH"],BGD:["S. Asia","BD"],BRB:["Latin America","BB"],BLR:["Europe & C. Asia","BY"],BEL:["Europe","BE"],BLZ:["Latin America","BZ"],BEN:["Sub-Saharan Africa","BJ"],BTN:["S. Asia","BT"],BOL:["Latin America","BO"],BIH:["Europe","BA"],BWA:["Sub-Saharan Africa","BW"],BRA:["Latin America","BR"],BRN:["East Asia & Pacific","BN"],BGR:["Europe","BG"],BFA:["Sub-Saharan Africa","BF"],BDI:["Sub-Saharan Africa","BI"],KHM:["East Asia & Pacific","KH"],CMR:["Sub-Saharan Africa","CM"],CAN:["North America","CA"],CPV:["Sub-Saharan Africa","CV"],CAF:["Sub-Saharan Africa","CF"],TCD:["Sub-Saharan Africa","TD"],CHL:["Latin America","CL"],CHN:["East Asia & Pacific","CN"],COL:["Latin America","CO"],COM:["Sub-Saharan Africa","KM"],COG:["Sub-Saharan Africa","CG"],COD:["Sub-Saharan Africa","CD"],CRI:["Latin America","CR"],CIV:["Sub-Saharan Africa","CI"],HRV:["Europe","HR"],CUB:["Latin America","CU"],CYP:["Europe","CY"],CZE:["Europe","CZ"],DNK:["Europe","DK"],DJI:["Sub-Saharan Africa","DJ"],DMA:["Latin America","DM"],DOM:["Latin America","DO"],ECU:["Latin America","EC"],EGY:["MENA","EG"],SLV:["Latin America","SV"],GNQ:["Sub-Saharan Africa","GQ"],ERI:["Sub-Saharan Africa","ER"],EST:["Europe","EE"],SWZ:["Sub-Saharan Africa","SZ"],ETH:["Sub-Saharan Africa","ET"],FJI:["East Asia & Pacific","FJ"],FIN:["Europe","FI"],FRA:["Europe","FR"],GAB:["Sub-Saharan Africa","GA"],GMB:["Sub-Saharan Africa","GM"],GEO:["Europe & C. Asia","GE"],DEU:["Europe","DE"],GHA:["Sub-Saharan Africa","GH"],GRC:["Europe","GR"],GRD:["Latin America","GD"],GTM:["Latin America","GT"],GIN:["Sub-Saharan Africa","GN"],GNB:["Sub-Saharan Africa","GW"],GUY:["Latin America","GY"],HTI:["Latin America","HT"],HND:["Latin America","HN"],HUN:["Europe","HU"],ISL:["Europe","IS"],IND:["S. Asia","IN"],IDN:["East Asia & Pacific","ID"],IRN:["MENA","IR"],IRQ:["MENA","IQ"],IRL:["Europe","IE"],ISR:["MENA","IL"],ITA:["Europe","IT"],JAM:["Latin America","JM"],JPN:["East Asia & Pacific","JP"],JOR:["MENA","JO"],KAZ:["Europe & C. Asia","KZ"],KEN:["Sub-Saharan Africa","KE"],KIR:["East Asia & Pacific","KI"],PRK:["East Asia & Pacific","KP"],KOR:["East Asia & Pacific","KR"],KWT:["MENA","KW"],KGZ:["Europe & C. Asia","KG"],LAO:["East Asia & Pacific","LA"],LVA:["Europe","LV"],LBN:["MENA","LB"],LSO:["Sub-Saharan Africa","LS"],LBR:["Sub-Saharan Africa","LR"],LBY:["MENA","LY"],LIE:["Europe","LI"],LTU:["Europe","LT"],LUX:["Europe","LU"],MDG:["Sub-Saharan Africa","MG"],MWI:["Sub-Saharan Africa","MW"],MYS:["East Asia & Pacific","MY"],MDV:["S. Asia","MV"],MLI:["Sub-Saharan Africa","ML"],MLT:["Europe","MT"],MHL:["East Asia & Pacific","MH"],MRT:["Sub-Saharan Africa","MR"],MUS:["Sub-Saharan Africa","MU"],MEX:["Latin America","MX"],FSM:["East Asia & Pacific","FM"],MDA:["Europe & C. Asia","MD"],MCO:["Europe","MC"],MNG:["East Asia & Pacific","MN"],MNE:["Europe","ME"],MAR:["MENA","MA"],MOZ:["Sub-Saharan Africa","MZ"],MMR:["East Asia & Pacific","MM"],NAM:["Sub-Saharan Africa","NA"],NRU:["East Asia & Pacific","NR"],NPL:["S. Asia","NP"],NLD:["Europe","NL"],NZL:["East Asia & Pacific","NZ"],NIC:["Latin America","NI"],NER:["Sub-Saharan Africa","NE"],NGA:["Sub-Saharan Africa","NG"],MKD:["Europe","MK"],NOR:["Europe","NO"],OMN:["MENA","OM"],PAK:["S. Asia","PK"],PLW:["East Asia & Pacific","PW"],PAN:["Latin America","PA"],PNG:["East Asia & Pacific","PG"],PRY:["Latin America","PY"],PER:["Latin America","PE"],PHL:["East Asia & Pacific","PH"],POL:["Europe","PL"],PRT:["Europe","PT"],QAT:["MENA","QA"],ROU:["Europe","RO"],RUS:["Europe & C. Asia","RU"],RWA:["Sub-Saharan Africa","RW"],KNA:["Latin America","KN"],LCA:["Latin America","LC"],VCT:["Latin America","VC"],WSM:["East Asia & Pacific","WS"],SMR:["Europe","SM"],STP:["Sub-Saharan Africa","ST"],SAU:["MENA","SA"],SEN:["Sub-Saharan Africa","SN"],SRB:["Europe","RS"],SYC:["Sub-Saharan Africa","SC"],SLE:["Sub-Saharan Africa","SL"],SGP:["East Asia & Pacific","SG"],SVK:["Europe","SK"],SVN:["Europe","SI"],SLB:["East Asia & Pacific","SB"],SOM:["Sub-Saharan Africa","SO"],ZAF:["Sub-Saharan Africa","ZA"],SSD:["Sub-Saharan Africa","SS"],ESP:["Europe","ES"],LKA:["S. Asia","LK"],SDN:["Sub-Saharan Africa","SD"],SUR:["Latin America","SR"],SWE:["Europe","SE"],CHE:["Europe","CH"],SYR:["MENA","SY"],TWN:["East Asia & Pacific","TW"],TJK:["Europe & C. Asia","TJ"],TZA:["Sub-Saharan Africa","TZ"],THA:["East Asia & Pacific","TH"],TLS:["East Asia & Pacific","TL"],TGO:["Sub-Saharan Africa","TG"],TON:["East Asia & Pacific","TO"],TTO:["Latin America","TT"],TUN:["MENA","TN"],TUR:["Europe & C. Asia","TR"],TKM:["Europe & C. Asia","TM"],TUV:["East Asia & Pacific","TV"],UGA:["Sub-Saharan Africa","UG"],UKR:["Europe & C. Asia","UA"],ARE:["MENA","AE"],GBR:["Europe","GB"],USA:["North America","US"],URY:["Latin America","UY"],UZB:["Europe & C. Asia","UZ"],VUT:["East Asia & Pacific","VU"],VEN:["Latin America","VE"],VNM:["East Asia & Pacific","VN"],YEM:["MENA","YE"],ZMB:["Sub-Saharan Africa","ZM"],ZWE:["Sub-Saharan Africa","ZW"],PSE:["MENA","PS"],ESH:["MENA","EH"],GRL:["Europe","GL"],PRI:["Latin America","PR"],FLK:["Latin America","FK"],NCL:["East Asia & Pacific","NC"],HKG:["East Asia & Pacific","HK"],MAC:["East Asia & Pacific","MO"]};
+
+    // ---- Formatters ----
+    function fmtPeople(n){ if(n==null) return "—";
+      if(n>=1e9) return (n/1e9).toFixed(2)+" B"; if(n>=1e6) return (n/1e6).toFixed(n>=1e8?0:1)+" M";
+      if(n>=1e3) return (n/1e3).toFixed(0)+" K"; return String(Math.round(n)); }
+    function fmtYears(n){ return n==null? "—" : n.toFixed(1)+" yrs"; }
+    function fmtPct(n){ return n==null? "—" : n.toFixed(1)+"%"; }
+    function fmtNum(n){ return n==null? "—" : n.toFixed(Math.abs(n)>=100?0:1); }
+    function fmtKwh(n){ return n==null? "—" : new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(Math.round(n))+" kWh"; }
+    function fmtUSD0(n){ return n==null? "—" : "$"+new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(Math.round(n)); }
+    function curRate(){ return state.fx[state.currency] || 1; }
+    function curMeta(){ return CURRENCIES.find(c=>c[0]===state.currency) || ["USD","$"]; }
+    function fmtMoney(nUsd){ if(nUsd==null) return "—"; const v=nUsd*curRate(); const sym=curMeta()[1];
+      const num = new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(Math.round(v));
+      return /[A-Z]{2,} $/.test(sym) || /[a-z]{1,3} $/.test(sym) ? sym+num : sym+num; }
+    function flagEmoji(a2){ if(!a2||a2.length!==2) return "🏳️"; return a2.toUpperCase().replace(/./g,c=>String.fromCodePoint(127397+c.charCodeAt(0))); }
+
+    // ---- State ----
+    const state = {
+      metric:"pop", currency:"USD", year:"latest",
+      fx:{USD:1}, latest:{}, byYear:{}, seriesCache:{}, loadedLatest:new Set(),
+      selectedA3:null, selectedFeat:null,
+      benchGroup:"world",        // world | region | income
+      groupMeta:{},              // a3 -> {regionId, region, incomeId, income}
+      aggSeries:{}               // metricKey -> { a3: [{y,v}] }  (all-country series, cached, for benchmark line)
+    };
+    let features=[], path, svg, g, zoom, colorScale=()=>"#2a3350", markersSel=null, mapW=0, mapH=0;
+    // Notable small economies / city-states that are ~sub-pixel polygons; always get a marker.
+    const SMALL_ECON = new Set(["HKG","MAC","SGP","LUX","MLT","AND","LIE","SMR","MCO","MDV","MHL","NRU","TUV","PLW","KIR","FSM","WSM","TON","STP","SYC","COM","CPV","BRB","ATG","DMA","GRD","KNA","LCA","VCT","BRN","MUS","BHR"]);
+    function latestMaxYear(){ let mx=0; for(const a3 in state.latest){ const d=state.latest[a3]; for(const k in d){ const y=+d[k].y; if(y>mx) mx=y; } } return mx||"—"; }
+    const el = id => document.getElementById(id);
+    const tooltip = el("tooltip");
+
+    // ---- Fetch helpers ----
+    async function wbFetchOnce(url, timeoutMs){
+      const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(), timeoutMs);
+      try{ const r=await fetch(url,{signal:ctl.signal}); if(!r.ok) throw new Error("WB "+r.status);
+        const j=await r.json(); return (Array.isArray(j)&&Array.isArray(j[1])) ? j[1] : []; }
+      finally{ clearTimeout(to); }
+    }
+    async function wbFetch(scope, code, extra, timeoutMs){
+      const url = `https://api.worldbank.org/v2/country/${scope}/indicator/${code}?format=json&per_page=20000&${extra}`;
+      const t = timeoutMs || 14000;
+      for(let attempt=0; attempt<2; attempt++){
+        try{ return await wbFetchOnce(url, t); }
+        catch(e){ if(attempt===1) throw e; await new Promise(r=>setTimeout(r,800)); }
+      }
+    }
+    function ingestInto(target, key, rows){
+      for(const row of rows){ const a3=row.countryiso3code; if(!a3||a3.length!==3||row.value==null) continue;
+        (target[a3]=target[a3]||{})[key] = { v:+row.value, y:row.date }; }
+    }
+    // reduce a multi-year series to the most-recent non-null value per country
+    function latestPerCountry(rows){
+      const best={};
+      for(const r of rows||[]){ const a=r.countryiso3code; if(!a||a.length!==3||r.value==null) continue;
+        if(!best[a] || +r.date > +best[a].date) best[a]=r; }
+      return Object.values(best);
+    }
+    async function runLimited(items, limit, fn){
+      let i=0; const n=Math.min(limit, items.length);
+      await Promise.all(Array.from({length:n}, async ()=>{ while(i<items.length){ const idx=i++; await fn(items[idx], idx); } }));
+    }
+    async function loadMetricLatest(key){
+      if(state.loadedLatest.has(key)) return;
+      const code=METRICS[key].wb;
+      // primary: "most recent value per country" (one row each)
+      try{ const rows=await wbFetch("all", code, "mrnev=1");
+        if(rows && rows.some(r=>r && r.value!=null)){ ingestInto(state.latest,key,rows); state.loadedLatest.add(key); return; }
+      }catch(e){ /* some indicators (e.g. market cap, NPL) reject mrnev — fall through */ }
+      // fallback: pull a recent window and keep the latest value per country
+      try{ const y=new Date().getFullYear(); const raw=await wbFetch("all", code, "date="+(y-14)+":"+y);
+        ingestInto(state.latest,key,latestPerCountry(raw)); state.loadedLatest.add(key);
+      }catch(e){ /* leave unloaded so it can retry later */ }
+    }
+    async function backgroundLoadRest(){
+      const rest=LOAD_KEYS.filter(k=>!state.loadedLatest.has(k));
+      for(let i=0;i<rest.length;i+=3){ await Promise.allSettled(rest.slice(i,i+3).map(loadMetricLatest)); }
+      paint(); if(state.selectedFeat) selectCountry(state.selectedFeat);
+    }
+    async function loadYear(y){
+      if(state.byYear[y]) return state.byYear[y];
+      const target={}; state.byYear[y]=target;
+      await runLimited(LOAD_KEYS, 3, async k=>{ try{ const rows=await wbFetch("all", METRICS[k].wb, "date="+y); ingestInto(target,k,rows); }catch(e){} });
+      return target;
+    }
+    async function loadFX(){
+      try{ const r=await fetch("https://open.er-api.com/v6/latest/USD"); const j=await r.json();
+        if(j && j.rates){ state.fx = Object.assign({USD:1}, j.rates); } }catch(e){ /* USD only */ }
+    }
+    async function loadSeries(a3){
+      if(state.seriesCache[a3]) return state.seriesCache[a3];
+      const out={}; let anyFail=false;
+      await Promise.allSettled(METRIC_ORDER.map(async k=>{
+        try{ const rows = await wbFetch(a3, METRICS[k].wb, "date=1965:2025");
+          out[k] = rows.filter(x=>x.value!=null).map(x=>({y:+x.date, v:+x.value})).sort((a,b)=>a.y-b.y); }
+        catch(e){ out[k]=null; anyFail=true; }
+      }));
+      if(!anyFail) state.seriesCache[a3]=out;   // cache only fully-loaded results so retries can recover
+      return out;
+    }
+
+    // ---- Dataset for current year selection ----
+    function dataset(){ return state.year==="latest" ? state.latest : (state.byYear[state.year]||{}); }
+    function recOf(a3, key){ const d=dataset()[a3]; return d && d[key] ? d[key] : null; }
+
+    // ---- Benchmark engine: population-weighted World / Region / Income-group reference ----
+    async function loadGroupMeta(){
+      try{ const r=await fetch("https://api.worldbank.org/v2/country?format=json&per_page=400");
+        const j=await r.json(); const rows=(Array.isArray(j)&&Array.isArray(j[1]))?j[1]:[];
+        const gm={}; for(const c of rows){ if(!c.region||c.region.id==="NA") continue;   // skip aggregates
+          gm[c.id]={regionId:c.region.id, region:(c.region.value||"").trim(), incomeId:c.incomeLevel.id, income:(c.incomeLevel.value||"").trim()}; }
+        state.groupMeta=gm;
+      }catch(e){ /* benchmark degrades to World-only if metadata unavailable */ }
+    }
+    function groupInfo(a3){ return state.groupMeta[a3]||null; }
+    function groupLabel(a3, group){
+      if(group==="region"){ const g=groupInfo(a3); return g?g.region:"region"; }
+      if(group==="income"){ const g=groupInfo(a3); return g?g.income:"income group"; }
+      return "world";
+    }
+    function benchMembers(a3, group){
+      const ds=dataset();
+      if(group==="world" || !state.groupMeta[a3]) return Object.keys(ds);
+      const me=state.groupMeta[a3]; const key = group==="region"?"regionId":"incomeId";
+      return Object.keys(ds).filter(x=>state.groupMeta[x] && state.groupMeta[x][key]===me[key]);
+    }
+    function isPctMetric(key){ const f=METRICS[key].fmt; return f===fmtPct; }
+    // latest-value benchmark: {value (pop-weighted), pctl, n}
+    function benchLatest(key, a3, group){
+      const ds=dataset(); const members=benchMembers(a3,group);
+      const sum = METRICS[key].agg==="sum"; let sw=0, swv=0; const vals=[];
+      for(const c of members){ const r=ds[c]&&ds[c][key]; if(!r||r.v==null) continue;
+        vals.push(r.v);
+        if(sum){ swv+=r.v; sw=1; }
+        else { const p=ds[c]&&ds[c].pop; if(p&&p.v>0){ swv+=r.v*p.v; sw+=p.v; } }
+      }
+      if(!vals.length) return null;
+      const value = sum ? swv : (sw>0 ? swv/sw : null);
+      const mine=ds[a3]&&ds[a3][key];
+      let pctl=null; if(mine&&mine.v!=null){ vals.sort((x,y)=>x-y); const below=vals.filter(v=>v<mine.v).length; pctl=Math.round(below/vals.length*100); }
+      return {value, pctl, n:vals.length};
+    }
+    // one-line comparison text for a tile footer
+    function benchText(key, a3, group){
+      const b=benchLatest(key,a3,group); if(!b||b.value==null) return null;
+      const mine=recOf(a3,key); if(!mine||mine.v==null) return null;
+      const g=groupLabel(a3,group); const parts=[];
+      if(b.pctl!=null){ const top=100-b.pctl; parts.push(top<=50 ? "top "+Math.max(top,1)+"%" : "bottom "+Math.max(b.pctl,1)+"%"); }
+      if(METRICS[key].agg!=="sum"){
+        if(isPctMetric(key)){ const d=mine.v-b.value; parts.push((d>=0?"+":"")+d.toFixed(1)+" pts vs "+g); }
+        else if(b.value>0){ const ratio=mine.v/b.value; parts.push((ratio>=1?ratio.toFixed(ratio>=10?0:1)+"× ":(1/ratio).toFixed(1)+"× below ")+g); }
+      }
+      return {text:parts.join(" · "), b, g};
+    }
+    // benchmark trend series (pop-weighted per year, using latest pop as fixed weights)
+    async function loadAggSeries(key){
+      if(state.aggSeries[key]) return state.aggSeries[key];
+      try{ const rows=await wbFetch("all", METRICS[key].wb, "date=1965:2025");
+        const by={}; for(const r of rows){ const a=r.countryiso3code; if(!a||a.length!==3||r.value==null) continue; (by[a]=by[a]||[]).push({y:+r.date, v:+r.value}); }
+        for(const a in by) by[a].sort((x,y)=>x.y-y.y);
+        state.aggSeries[key]=by; return by;
+      }catch(e){ return null; }
+    }
+    function benchSeries(key, a3, group){
+      const agg=state.aggSeries[key]; if(!agg) return null;
+      const members=benchMembers(a3,group); const sum=METRICS[key].agg==="sum";
+      const yw={};
+      for(const c of members){ const s=agg[c]; if(!s) continue;
+        const p = sum ? 1 : ((state.latest[c]&&state.latest[c].pop&&state.latest[c].pop.v)||0);
+        if(!sum && !p) continue;
+        for(const pt of s){ const o=yw[pt.y]||(yw[pt.y]={sw:0,swv:0}); o.swv+=pt.v*p; o.sw+=p; }
+      }
+      const out=Object.keys(yw).map(y=>({y:+y, v: yw[y].sw>0 ? yw[y].swv/yw[y].sw : null})).filter(o=>o.v!=null).sort((a,b)=>a.y-b.y);
+      return out.length>1 ? out : null;
+    }
+
+    // ---- Colour scale (domain in BASE USD; currency only affects labels) ----
+    function buildColorScale(){
+      const m=METRICS[state.metric], ds=dataset(), vals=[];
+      for(const a3 in ds){ const r=ds[a3][state.metric]; if(r && r.v>0) vals.push(r.v); }
+      vals.sort((a,b)=>a-b);
+      if(!vals.length){ colorScale=()=>"#2a3350"; return {lo:0,mid:0,hi:0}; }
+      const q=p=>vals[Math.min(vals.length-1,Math.max(0,Math.floor(p*(vals.length-1))))];
+      let lo=q(0.02), hi=q(0.98);
+      if(m.scale==="log"){ if(lo<=0) lo=vals.find(v=>v>0)||1; if(hi<=lo) hi=lo*1.0001;
+        const s=d3.scaleLog().domain([lo,hi]).range([0,1]).clamp(true);
+        colorScale=v=>SEQ(s(Math.max(v,lo))); return {lo,mid:Math.sqrt(lo*hi),hi}; }
+      if(hi<=lo) hi=lo+1;   // linear: negatives are fine (GDP growth, real interest rate)
+      const s=d3.scaleLinear().domain([lo,hi]).range([0,1]).clamp(true);
+      colorScale=v=>SEQ(s(v)); return {lo,mid:(lo+hi)/2,hi};
+    }
+    function paint(){
+      const m=METRICS[state.metric], b=buildColorScale(), ds=dataset();
+      const fill=d=>{ const a3=NUM2A3[String(+d.id)]; const r=a3&&ds[a3]&&ds[a3][state.metric]; return r?colorScale(r.v):"#2a3350"; };
+      g.selectAll("path.country").attr("fill", fill);
+      if(markersSel) markersSel.attr("fill", fill);
+      el("legendTitle").textContent = m.label + (m.money? " · "+state.currency : "");
+      el("legLo").textContent=m.fmt(b.lo); el("legMid").textContent=m.fmt(b.mid); el("legHi").textContent=m.fmt(b.hi);
+      const stops=[]; for(let i=0;i<=10;i++) stops.push(SEQ(i/10)); el("legendBar").style.background=`linear-gradient(90deg, ${stops.join(",")})`;
+      el("mapSub").textContent = `Colour shows ${m.label.toLowerCase()}${m.money? " ("+state.currency+")":""}. Small economies (Hong Kong, Singapore…) show as dots — zoom in. Pinch/scroll to zoom.`;
+      let cov=0; for(const a3 in ds){ if(ds[a3][state.metric]) cov++; }
+      const yLabel = state.year==="latest" ? ("latest · to "+latestMaxYear()) : ("year "+state.year);
+      el("coverageBadge").textContent = cov+" countries · "+yLabel;
+      if(state.year==="latest") el("year").options[0].textContent = "Latest (to "+latestMaxYear()+")";
+    }
+
+    // ---- Tooltip ----
+    function showTip(clientX,clientY,feat){
+      const a3=NUM2A3[String(+feat.id)], name=(feat.properties&&feat.properties.name)||"—", m=METRICS[state.metric];
+      const r=a3?recOf(a3,state.metric):null;
+      el("ttCountry").textContent=name;
+      el("ttValue").innerHTML = r ? `${m.label}: <b>${m.fmt(r.v)}</b> <span style="opacity:.7">(${r.y})</span>` : `${m.label}: <b>no data</b>`;
+      const box=el("mapHolder").getBoundingClientRect();
+      tooltip.style.left=(clientX-box.left)+"px"; tooltip.style.top=(clientY-box.top)+"px"; tooltip.style.opacity=1;
+    }
+    function hideTip(){ tooltip.style.opacity=0; }
+
+    // ---- Sparkline (single-series, thin, recessive) ----
+    const BENCH_COLOR="#f2b25c";
+    function drawSpark(container, series, fmt, selYear, annotate, bench){
+      container.innerHTML="";
+      if(!series || series.length<2){ container.innerHTML='<div style="font-size:10.5px;color:var(--muted);padding-top:10px;">No trend data</div>'; return; }
+      const W=container.clientWidth||220, H=40, pad=3;
+      const xs=series.map(d=>d.y), ys=series.map(d=>d.v);
+      const yr0=Math.min(...xs), yr1=Math.max(...xs);
+      const x=d3.scaleLinear().domain([yr0,yr1]).range([pad,W-pad]);
+      // clip benchmark to the country's year span so both lines share the x-axis
+      const bser=(bench&&bench.series)?bench.series.filter(d=>d.y>=yr0 && d.y<=yr1):null;
+      const hasB=bser&&bser.length>1;
+      const domVals=hasB?ys.concat(bser.map(d=>d.v)):ys;
+      const y=d3.scaleLinear().domain([Math.min(...domVals),Math.max(...domVals)]).range([H-pad,pad]).nice();
+      const svgn=d3.create("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("preserveAspectRatio","none");
+      const area=d3.area().x(d=>x(d.y)).y0(H-pad).y1(d=>y(d.v)).curve(d3.curveMonotoneX);
+      const line=d3.line().x(d=>x(d.y)).y(d=>y(d.v)).curve(d3.curveMonotoneX);
+      const gid="g"+Math.round(x(xs[0])*7+ys.length*13+W);
+      svgn.append("defs").html(`<linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="${SPARK_COLOR}" stop-opacity="0.35"/><stop offset="100%" stop-color="${SPARK_COLOR}" stop-opacity="0"/></linearGradient>`);
+      svgn.append("path").attr("d",area(series)).attr("fill",`url(#${gid})`);
+      if(hasB){ svgn.append("path").attr("d",line(bser)).attr("fill","none").attr("stroke",BENCH_COLOR)
+                  .attr("stroke-width",1.3).attr("stroke-dasharray","3 2.5").attr("stroke-opacity",0.85).attr("vector-effect","non-scaling-stroke"); }
+      svgn.append("path").attr("d",line(series)).attr("fill","none").attr("stroke",SPARK_COLOR).attr("stroke-width",1.6).attr("vector-effect","non-scaling-stroke");
+      const last=series[series.length-1];
+      svgn.append("circle").attr("cx",x(last.y)).attr("cy",y(last.v)).attr("r",2.4).attr("fill",SPARK_COLOR);
+      if(selYear && selYear!=="latest"){ const sy=+selYear; const pt=series.find(d=>d.y===sy);
+        if(pt){ svgn.append("line").attr("x1",x(sy)).attr("x2",x(sy)).attr("y1",pad).attr("y2",H-pad).attr("stroke","rgba(255,255,255,.28)").attr("stroke-dasharray","2 2").attr("vector-effect","non-scaling-stroke");
+          svgn.append("circle").attr("cx",x(sy)).attr("cy",y(pt.v)).attr("r",2.6).attr("fill","#fff"); } }
+      container.appendChild(svgn.node());
+      if(hasB){ const key=document.createElement("div"); key.className="benchkey";
+        key.innerHTML=`<span class="sk sk-c"></span>this country&nbsp;&nbsp;<span class="sk sk-b"></span>${bench.label} avg`;
+        container.appendChild(key); }
+      const label=document.createElement("div"); label.className="sparklabel"; container.appendChild(label);
+      const bAt=hasB?(yr=>{ let b=bser[0]; for(const d of bser){ if(Math.abs(d.y-yr)<Math.abs(b.y-yr)) b=d; } return b; }):null;
+      const hit=svgn.append("rect").attr("x",0).attr("y",0).attr("width",W).attr("height",H).attr("fill","transparent")
+        .style("cursor","crosshair").style("touch-action","pan-y");   // pan-y: page still scrolls; horizontal drag scrubs
+      const marker=svgn.append("circle").attr("r",3).attr("fill","#fff").style("opacity",0);
+      const scrub=function(ev){ const mx=d3.pointer(ev,svgn.node())[0]; const yr=Math.round(x.invert(mx));
+        let best=series[0]; for(const d of series){ if(Math.abs(d.y-yr)<Math.abs(best.y-yr)) best=d; }
+        marker.attr("cx",x(best.y)).attr("cy",y(best.v)).style("opacity",1);
+        const a=annotate?annotate(best.y):null;
+        const bt=bAt?bAt(best.y):null;
+        label.textContent=best.y+": "+fmt(best.v)+(bt?"  ·  "+bench.label+" "+fmt(bt.v):"")+(a?"  ·  "+a:""); label.style.opacity=1;
+      };
+      const clear=()=>{ marker.style("opacity",0); label.style.opacity=0; };
+      // pointer events cover mouse + touch + pen; capture keeps the read-out following the finger
+      hit.on("pointermove",scrub).on("pointerdown",function(ev){ try{ this.setPointerCapture(ev.pointerId); }catch(e){} scrub.call(this,ev); })
+         .on("pointerup",clear).on("pointercancel",clear).on("pointerleave",e=>{ if(e.pointerType==="mouse") clear(); });
+    }
+
+    // ---- Detail panel ----
+    async function selectCountry(feat){
+      const a3=NUM2A3[String(+feat.id)], name=(feat.properties&&feat.properties.name)||"—";
+      state.selectedA3=a3||null; state.selectedFeat=feat;
+      g.selectAll("path.country").classed("selected", d=>d===feat);
+      if(markersSel) markersSel.classed("selected", d=>d===feat).attr("stroke", d=>d===feat?"#fff":"#0b1020");
+      el("emptyState").style.display="none"; el("detailFilled").style.display="block";
+      el("selectedCountryBadge").textContent=a3||"—"; el("countrySubtitle").textContent="Showing "+name+" · tap another country to switch";
+      if(a3) el("country").value=String(+feat.id);
+      const meta=a3&&A3META[a3];
+      el("detailFlag").textContent = meta?flagEmoji(meta[1]):"🏳️";
+      el("detailName").textContent=name; el("detailRegion").textContent=meta?meta[0]:"—";
+      el("detailCapital").textContent = (a3&&CAPITALS[a3]) ? "  ·  Capital: "+CAPITALS[a3] : "";
+      el("noteShowing").textContent = state.year==="latest"?"Latest available":("Year "+state.year);
+      el("noteCurrency").textContent = state.currency; el("noteIso").textContent=a3||"—";
+
+      const grid=el("metricsGrid"); grid.innerHTML=""; const years=[]; const sparkHolders={};
+      // show a tile if it has data, OR if it hasn't finished loading yet (shows "loading…");
+      // hide only metrics we've confirmed have no value for this country.
+      const shown = a3 ? METRIC_ORDER.filter(k=> recOf(a3,k) || !state.loadedLatest.has(k)) : [];
+      for(const key of shown){
+        const m=METRICS[key]; const r=recOf(a3,key); if(r) years.push(r.y);
+        const div=document.createElement("div"); div.className="metric"+(key===state.metric?" active":"");
+        const valHtml = r
+          ? `<div class="v">${m.fmt(r.v)}</div><div class="hint">${m.unit+" · "+r.y}</div>`
+          : `<div class="v" style="font-size:15px;color:var(--muted);">loading…</div><div class="hint">${m.unit}</div>`;
+        let benchHtml="";
+        if(r){ const bt=benchText(key,a3,state.benchGroup);
+          if(bt){ const bmVal=(m.agg==="sum")?null:bt.b.value;
+            benchHtml=`<div class="bench">${bt.text}${bmVal!=null?` · ${bt.g} avg <b>${m.fmt(bmVal)}</b>`:""}</div>`; } }
+        div.innerHTML=`<p class="k">${m.label}${m.money?" ("+state.currency+")":""}</p>
+          ${valHtml}
+          ${benchHtml}
+          <div class="src">World Bank · ${m.wb}</div>
+          <div class="spark" data-k="${key}"></div>`;
+        grid.appendChild(div); sparkHolders[key]=div.querySelector(".spark");
+      }
+      if(!shown.length){ grid.innerHTML='<div style="grid-column:1/-1;color:var(--muted);font-size:12.5px;">No World Bank data available for this territory yet.</div>'; }
+      const ys=years.map(Number).filter(n=>!isNaN(n));
+      el("noteYears").textContent = ys.length ? (Math.min(...ys)===Math.max(...ys)?String(Math.min(...ys)):Math.min(...ys)+"–"+Math.max(...ys)) : "—";
+
+      renderComposition(a3);
+      renderAge(a3);
+      renderLeader(a3);
+
+      // one trend line under each metric that has data (limited concurrency, cached)
+      const ann = a3==="USA" ? usLeader : null;   // per-country leader overlay (US for now)
+      const sparkKeys = shown.filter(k=>recOf(a3,k));
+      for(const key of sparkKeys) sparkHolders[key].innerHTML='<div style="font-size:10px;color:var(--muted);padding-top:12px;">…</div>';
+      const benchG=state.benchGroup;
+      runLimited(sparkKeys, 4, async (key)=>{
+        const holder=sparkHolders[key]; if(!holder) return;
+        const series=await loadSeriesOne(a3, key);
+        if(state.selectedA3!==a3) return;
+        if(!series || series.length<2){ holder.innerHTML='<div style="font-size:10px;color:var(--muted);padding-top:12px;">no trend</div>'; return; }
+        const m=METRICS[key]; const conv=v=>m.money?v*curRate():v;
+        const disp=series.map(d=>({y:d.y, v:conv(d.v)}));
+        drawSpark(holder, disp, m.money?fmtMoneyRaw:m.fmt, state.year, ann, null);
+        // benchmark reference line (loaded lazily + cached; redraws this spark when ready)
+        loadAggSeries(key).then(()=>{
+          if(state.selectedA3!==a3 || state.benchGroup!==benchG) return;
+          const bs=benchSeries(key,a3,benchG); if(!bs) return;
+          drawSpark(holder, disp, m.money?fmtMoneyRaw:m.fmt, state.year, ann,
+                    { series: bs.map(d=>({y:d.y, v:conv(d.v)})), label: groupLabel(a3,benchG) });
+        });
+      });
+
+      if(window.matchMedia("(max-width:1000px)").matches){
+        el("detailFilled").scrollIntoView({behavior:"smooth", block:"start"});
+      }
+    }
+
+    async function loadSeriesOne(a3, key){
+      state.seriesCache[a3]=state.seriesCache[a3]||{};
+      if(state.seriesCache[a3][key]!==undefined) return state.seriesCache[a3][key];
+      try{ const rows=await wbFetch(a3, METRICS[key].wb, "date=1965:2025");
+        const s=rows.filter(x=>x.value!=null).map(x=>({y:+x.date, v:+x.value})).sort((a,b)=>a.y-b.y);
+        state.seriesCache[a3][key]=s; return s;
+      }catch(e){ return null; }
+    }
+
+    // GDP composition: sector stacked bar + demand-side bars (from already-loaded data)
+    function renderComposition(a3){
+      const box=el("compBox"); if(!box) return;
+      const ds=dataset(); const d=a3?ds[a3]:null;
+      const get=k=> (d && d[k] && d[k].v!=null) ? d[k].v : null;
+      const sec=COMP.sector.map(p=>({label:p[1],color:p[2],v:get(p[0])})).filter(s=>s.v!=null);
+      const dem=COMP.demand.map(p=>({label:p[1],color:p[2],v:get(p[0])})).filter(s=>s.v!=null);
+      if(!sec.length && !dem.length){ box.style.display="none"; return; }
+      box.style.display="block";
+      let html='<div class="comphd">GDP composition</div>';
+      if(sec.length){
+        const total=sec.reduce((a,s)=>a+Math.max(s.v,0),0)||1;
+        html+='<div class="compsub">By sector — what the economy produces</div>'+
+          '<div class="stackbar">'+sec.map(s=>`<span style="width:${(Math.max(s.v,0)/total*100).toFixed(1)}%;background:${s.color}" title="${s.label}: ${s.v.toFixed(1)}%"></span>`).join('')+'</div>'+
+          '<div class="stacklegend">'+sec.map(s=>`<span><i style="background:${s.color}"></i>${s.label} ${s.v.toFixed(0)}%</span>`).join('')+'</div>';
+      }
+      if(dem.length){
+        const maxv=Math.max(100, ...dem.map(s=>Math.abs(s.v)));
+        html+='<div class="compsub" style="margin-top:9px;">By demand — what drives it (% of GDP)</div>'+
+          dem.map(s=>`<div class="dembar"><span class="deml">${s.label}</span><span class="demtrack"><span class="demfill" style="width:${Math.min(Math.abs(s.v)/maxv*100,100).toFixed(1)}%;background:${s.color}"></span></span><span class="demv">${s.v.toFixed(0)}%</span></div>`).join('');
+      }
+      html+='<div class="csrc">Source: World Bank national accounts. Sector = value-added share; demand = expenditure share of GDP. (Sub-industry / top-product detail comes with the multi-source snapshot.)</div>';
+      box.innerHTML=html;
+    }
+    // Age structure stacked bar (0–14 / 15–64 / 65+)
+    function renderAge(a3){
+      const box=el("ageBox"); if(!box) return;
+      const ds=dataset(); const d=a3?ds[a3]:null;
+      const get=k=> (d && d[k] && d[k].v!=null) ? d[k].v : null;
+      const seg=AGE.map(p=>({label:p[1],color:p[2],v:get(p[0])})).filter(s=>s.v!=null);
+      if(seg.length<2){ box.style.display="none"; return; }
+      box.style.display="block";
+      const total=seg.reduce((a,s)=>a+Math.max(s.v,0),0)||1;
+      box.innerHTML='<div class="comphd">Age structure</div>'+
+        '<div class="compsub">Share of population by age band</div>'+
+        '<div class="stackbar">'+seg.map(s=>`<span style="width:${(Math.max(s.v,0)/total*100).toFixed(1)}%;background:${s.color}" title="${s.label}: ${s.v.toFixed(1)}%"></span>`).join('')+'</div>'+
+        '<div class="stacklegend">'+seg.map(s=>`<span><i style="background:${s.color}"></i>${s.label} ${s.v.toFixed(0)}%</span>`).join('')+'</div>'+
+        '<div class="csrc">Source: World Bank (UN World Population Prospects). Working-age = 15–64.</div>';
+    }
+    // Visible head-of-state timeline (US for now; extensible per country)
+    function renderLeader(a3){
+      const box=el("leaderBox"); if(!box) return;
+      if(a3!=="USA"){ box.style.display="none"; return; }
+      const selY = state.year==="latest" ? new Date().getFullYear() : +state.year;
+      const cur = usLeader(selY);
+      box.style.display="block";
+      // show current + recent presidents as a compact party-coloured timeline
+      const recent = US_LEADERS.filter(L=>L[1]>1988).slice().reverse();
+      let html='<div class="comphd">Head of state '+(cur?'· '+selY+': <b style="color:'+(cur.includes("(D)")?"#4aa3ff":"#ff6b6b")+'">'+cur+'</b>':'')+'</div>'+
+        '<div class="ldtl">';
+      html+=recent.map(L=>{
+        const active = selY>=L[0] && selY<L[1];
+        const col = L[3]==="D" ? "#4aa3ff" : "#ff6b6b";
+        const end = L[1]>2050 ? "now" : L[1];
+        return `<span class="ldchip${active?' on':''}" style="border-color:${col}"><i style="background:${col}"></i>${L[2]} <em>${L[0]}–${end}</em></span>`;
+      }).join('');
+      html+='</div><div class="csrc">Source: curated (US presidents & party). Party colour: blue = Democratic, red = Republican.</div>';
+      box.innerHTML=html;
+    }
+    // money formatter that takes an ALREADY-converted value (for sparkline labels)
+    function fmtMoneyRaw(v){ const sym=curMeta()[1]; return sym+new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(Math.round(v)); }
+
+    // ---- Build map ----
+    function buildMap(topology){
+      features = topojson.feature(topology, topology.objects.countries).features;
+      const holder=el("mapHolder"), W=holder.clientWidth, H=holder.clientHeight;
+      mapW=W; mapH=H;
+      svg=d3.select("#map").attr("viewBox",`0 0 ${W} ${H}`).attr("preserveAspectRatio","xMidYMid meet");
+      const proj=d3.geoNaturalEarth1().fitExtent([[6,6],[W-6,H-6]],{type:"Sphere"});
+      path=d3.geoPath(proj); g=svg.append("g");
+      g.append("path").attr("class","sphere").attr("d",path({type:"Sphere"}));
+      g.append("path").attr("class","graticule").attr("d",path(d3.geoGraticule10()));
+      g.selectAll("path.country").data(features).enter().append("path")
+        .attr("class","country").attr("d",path)
+        .on("mousemove",(e,d)=>showTip(e.clientX,e.clientY,d))
+        .on("mouseleave",hideTip)
+        .on("click",(e,d)=>{ showTip(e.clientX,e.clientY,d); selectCountry(d); });
+      // Markers so tiny / city-state economies (Hong Kong, Singapore, Macau, microstates) are visible & clickable.
+      const markerFeats = features.filter(f=>{ const a3=NUM2A3[String(+f.id)]; if(!a3) return false;
+        if(!(SMALL_ECON.has(a3) || path.area(f) < 9)) return false;
+        const c=path.centroid(f); return isFinite(c[0]) && isFinite(c[1]); });
+      const gm = g.append("g").attr("class","markers");
+      gm.selectAll("circle.cmarker").data(markerFeats).enter().append("circle")
+        .attr("class","cmarker")
+        .attr("cx",d=>path.centroid(d)[0]).attr("cy",d=>path.centroid(d)[1])
+        .attr("r",3.4).attr("stroke","#0b1020").attr("stroke-width",1).style("cursor","pointer")
+        .on("mousemove",(e,d)=>showTip(e.clientX,e.clientY,d))
+        .on("mouseleave",hideTip)
+        .on("click",(e,d)=>{ showTip(e.clientX,e.clientY,d); selectCountry(d); });
+      markersSel = gm.selectAll("circle.cmarker");
+      zoom=d3.zoom().scaleExtent([1,9]).on("zoom",e=>{ g.attr("transform",e.transform);
+        if(markersSel) markersSel.attr("r",3.4/e.transform.k).attr("stroke-width",1/e.transform.k); });
+      svg.call(zoom).on("mousedown.g",()=>svg.classed("grabbing",true)).on("mouseup.g",()=>svg.classed("grabbing",false));
+      el("zin").onclick=()=>svg.transition().duration(250).call(zoom.scaleBy,1.6);
+      el("zout").onclick=()=>svg.transition().duration(250).call(zoom.scaleBy,1/1.6);
+      el("zreset").onclick=()=>svg.transition().duration(400).call(zoom.transform,d3.zoomIdentity);
+    }
+
+    function fail(msg){ const e=el("errbox"); e.textContent=msg; e.classList.add("show"); }
+    function mini(on,msg){ el("miniloadMsg").textContent=msg||"Loading…"; el("miniload").classList.toggle("show",on); }
+
+    // ---- Country picker + zoom-to ----
+    function zoomTo(feat){
+      if(!path||!zoom) return;
+      const b=path.bounds(feat); const cx=(b[0][0]+b[1][0])/2, cy=(b[0][1]+b[1][1])/2;
+      if(!isFinite(cx)||!isFinite(cy)) return;
+      const bw=Math.max(b[1][0]-b[0][0],4), bh=Math.max(b[1][1]-b[0][1],4);
+      let k=0.45*Math.min(mapW/bw, mapH/bh); k=Math.max(2.5, Math.min(k,7));
+      const t=d3.zoomIdentity.translate(mapW/2 - k*cx, mapH/2 - k*cy).scale(k);
+      svg.transition().duration(650).call(zoom.transform, t);
+    }
+    function populateCountries(){
+      const sel=el("country");
+      const list=features
+        .filter(f=>NUM2A3[String(+f.id)] && f.properties && f.properties.name)
+        .map(f=>({id:String(+f.id), name:f.properties.name}))
+        .sort((a,b)=>a.name.localeCompare(b.name));
+      const seen=new Set();
+      for(const c of list){ if(seen.has(c.id)) continue; seen.add(c.id);
+        const o=document.createElement("option"); o.value=c.id; o.textContent=c.name; sel.appendChild(o); }
+    }
+
+    // ---- Populate controls ----
+    function populateYears(){
+      const sel=el("year"); for(let y=2025;y>=1970;y--){ const o=document.createElement("option"); o.value=String(y); o.textContent=String(y); sel.appendChild(o); }
+    }
+    function populateCurrencies(){
+      const sel=el("currency"); sel.innerHTML="";
+      CURRENCIES.forEach(c=>{ if(c[0]!=="USD" && !(c[0] in state.fx)) return; const o=document.createElement("option"); o.value=c[0]; o.textContent=c[0]+" "+(c[1].trim()||""); sel.appendChild(o); });
+      sel.value="USD";
+    }
+
+    async function boot(){
+      try{
+        populateYears();
+        const topoP=fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json").then(r=>{if(!r.ok)throw new Error("map "+r.status);return r.json();});
+        el("loadingMsg").textContent="Loading map…";
+        buildMap(await topoP);
+        populateCountries();
+        el("loadingMsg").textContent="Loading data…";
+        await Promise.allSettled([ loadFX(), loadMetricLatest(state.metric), loadGroupMeta() ]);
+        populateCurrencies();
+        paint();
+        el("loading").classList.add("hide");
+        if(!state.loadedLatest.size) fail("Couldn't reach the World Bank API — check your network and reload.");
+        backgroundLoadRest();   // fetch the other metrics in the background (small batches avoid rate limits)
+      }catch(err){ console.error(err); el("loading").classList.add("hide"); fail("Failed to load: "+err.message); }
+    }
+
+    // ---- Events ----
+    el("country").addEventListener("change",e=>{ const id=e.target.value; if(!id) return;
+      const feat=features.find(f=>String(+f.id)===id); if(feat){ selectCountry(feat); zoomTo(feat); } });
+    el("metric").addEventListener("change",async e=>{ state.metric=e.target.value;
+      if(state.year==="latest" && !state.loadedLatest.has(state.metric)){ mini(true,"Loading "+METRICS[state.metric].label+"…"); await loadMetricLatest(state.metric); mini(false); }
+      paint(); if(state.selectedFeat) selectCountry(state.selectedFeat); });
+    el("currency").addEventListener("change",e=>{ state.currency=e.target.value; paint(); if(state.selectedFeat) selectCountry(state.selectedFeat); });
+    el("benchBar").addEventListener("click",e=>{ const b=e.target.closest(".benchbtn"); if(!b) return;
+      state.benchGroup=b.dataset.g;
+      el("benchBar").querySelectorAll(".benchbtn").forEach(x=>x.classList.toggle("on", x===b));
+      if(state.selectedFeat) selectCountry(state.selectedFeat); });
+    el("year").addEventListener("change",async e=>{
+      state.year=e.target.value;
+      if(state.year!=="latest" && !state.byYear[state.year]){ mini(true,"Loading "+state.year+"…"); await loadYear(state.year); mini(false); }
+      paint(); if(state.selectedFeat) selectCountry(state.selectedFeat);
+    });
+
+    boot();
+  })();
+  </script>
+</body>
+</html>
