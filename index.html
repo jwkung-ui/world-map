@@ -359,7 +359,9 @@
       c_exp: {label:"Exports",     wb:"NE.EXP.GNFS.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
       c_imp: {label:"Imports",     wb:"NE.IMP.GNFS.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true}
     };
-    const METRIC_ORDER = ["gdp","income","gdp_growth","inflation","unemployment","misery","interest","debt","tax","cab","trade","remit","hh_cons_pc","mktcap","traded","npl","pop","pop_growth","urban","dep_ratio","gini","life","fertility","internet","mobile","health","rnd","co2","elec_pc","elec_access","renew","military","tourism","hdi","happy","bigmac"];
+    // Tile order in the country panel — lead with the universally-wanted basics, then depth.
+    // This also sets background-load priority, so the essential tiles fill first.
+    const METRIC_ORDER = ["pop","gdp","income","gdp_growth","inflation","unemployment","interest","life","debt","pop_growth","urban","internet","fertility","hdi","happy","tax","cab","trade","remit","hh_cons_pc","misery","mktcap","traded","npl","dep_ratio","gini","mobile","health","rnd","co2","elec_pc","elec_access","renew","military","tourism","bigmac"];
     const COMP = { sector:[["c_agri","Agriculture","#19c37d"],["c_ind","Industry","#7c5cff"],["c_srv","Services","#ffd166"]],
                    demand:[["c_cons","Household consumption","#7c5cff"],["c_inv","Investment","#19c37d"],["c_gov","Government","#ffd166"],["c_exp","Exports","#4aa3ff"],["c_imp","Imports","#ff8c6b"]] };
     const AGE = [["a_014","0–14","#4aa3ff"],["a_1564","15–64","#19c37d"],["a_65","65+","#ffd166"]];
