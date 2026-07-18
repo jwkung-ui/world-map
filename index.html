@@ -540,8 +540,22 @@
     }
     async function backgroundLoadRest(){
       const rest=LOAD_KEYS.filter(k=>!state.loadedLatest.has(k));
+      if(!rest.length) return;
       for(let i=0;i<rest.length;i+=3){ await Promise.allSettled(rest.slice(i,i+3).map(loadMetricLatest)); }
       paint(); if(state.selectedFeat) selectCountry(state.selectedFeat);
+    }
+    // Fast path: one static file with every metric's latest value + region/income metadata.
+    async function loadSnapshot(){
+      try{
+        const r=await fetch("snapshot.json"); if(!r.ok) return false;
+        const s=await r.json(); if(!s || !s.latest) return false;
+        state.latest = s.latest;
+        if(s.groupMeta && Object.keys(s.groupMeta).length) state.groupMeta = s.groupMeta;
+        const present=new Set(); for(const a in s.latest) for(const k in s.latest[a]) present.add(k);
+        for(const k of present) if(METRICS[k]) state.loadedLatest.add(k);
+        state.snapshotDate = s.generated || null;
+        return present.size>0;
+      }catch(e){ return false; }
     }
     async function loadYear(y){
       if(state.byYear[y]) return state.byYear[y];
@@ -1001,12 +1015,20 @@
         buildMap(await topoP);
         populateCountries();
         el("loadingMsg").textContent="Loading data…";
-        await Promise.allSettled([ loadFX(), loadMetricLatest(state.metric), loadGroupMeta() ]);
-        populateCurrencies();
-        paint();
-        el("loading").classList.add("hide");
-        if(!state.loadedLatest.size) fail("Couldn't reach the World Bank API — check your network and reload.");
-        backgroundLoadRest();   // fetch the other metrics in the background (small batches avoid rate limits)
+        // Fast path: load the pre-built snapshot (all latest values in one request) if present.
+        const snap = await loadSnapshot();
+        if(snap){
+          await loadFX(); populateCurrencies(); paint(); el("loading").classList.add("hide");
+          backgroundLoadRest();   // fills any metric missing from the snapshot; otherwise a no-op
+        } else {
+          // Fallback: no snapshot — fetch live (slower, used when running the raw file or before a snapshot is built).
+          await Promise.allSettled([ loadFX(), loadMetricLatest(state.metric), loadGroupMeta() ]);
+          populateCurrencies();
+          paint();
+          el("loading").classList.add("hide");
+          if(!state.loadedLatest.size) fail("Couldn't reach the World Bank API — check your network and reload.");
+          backgroundLoadRest();
+        }
       }catch(err){ console.error(err); el("loading").classList.add("hide"); fail("Failed to load: "+err.message); }
     }
 

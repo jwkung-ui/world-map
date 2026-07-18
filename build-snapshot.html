@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Build snapshot — World Map</title>
+<style>
+  body{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b1020; color:#e8eefc; margin:0; padding:32px; line-height:1.5; }
+  .card{ max-width:640px; margin:0 auto; background:#111a33; border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:24px; }
+  h1{ font-size:20px; margin:0 0 6px; } p{ color:#a9b4d6; font-size:14px; }
+  button{ font:inherit; font-size:15px; font-weight:600; background:#7c5cff; color:#fff; border:none; border-radius:10px; padding:12px 20px; cursor:pointer; margin-top:8px; }
+  button:disabled{ opacity:.5; cursor:default; }
+  #log{ margin-top:18px; font-size:12.5px; font-family:ui-monospace,Menlo,Consolas,monospace; background:#0b1020; border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:12px; max-height:320px; overflow:auto; white-space:pre-wrap; }
+  .ok{ color:#54d6a0; } .warn{ color:#f2b25c; } .bar{ height:8px; background:rgba(255,255,255,.1); border-radius:5px; overflow:hidden; margin-top:12px; }
+  .bar > i{ display:block; height:100%; width:0; background:#19c37d; transition:width .2s; }
+</style></head>
+<body><div class="card">
+  <h1>Build the World Map data snapshot</h1>
+  <p>This fetches every metric's latest value for every country (World Bank + Our World in Data + The Economist) and downloads a single <b>snapshot.json</b>. Drop that file next to <code>index.html</code> in your repo and push — the map then loads instantly from it instead of making ~45 live calls per visitor.</p>
+  <p>Takes about a minute. Keep this tab focused while it runs.</p>
+  <button id="go">Build snapshot.json</button>
+  <div class="bar"><i id="prog"></i></div>
+  <div id="log"></div>
+</div>
+<script>
+const WB = {"pop": "SP.POP.TOTL", "gdp": "NY.GDP.PCAP.PP.CD", "income": "NY.GNP.PCAP.PP.CD", "gdp_growth": "NY.GDP.MKTP.KD.ZG", "inflation": "FP.CPI.TOTL.ZG", "unemployment": "SL.UEM.TOTL.ZS", "interest": "FR.INR.RINR", "debt": "GC.DOD.TOTL.GD.ZS", "life": "SP.DYN.LE00.IN", "pop_growth": "SP.POP.GROW", "fertility": "SP.DYN.TFRT.IN", "internet": "IT.NET.USER.ZS", "co2": "EN.GHG.CO2.PC.CE.AR5", "elec_pc": "EG.USE.ELEC.KH.PC", "elec_access": "EG.ELC.ACCS.ZS", "renew": "EG.FEC.RNEW.ZS", "tax": "GC.TAX.TOTL.GD.ZS", "cab": "BN.CAB.XOKA.GD.ZS", "trade": "NE.TRD.GNFS.ZS", "remit": "BX.TRF.PWKR.DT.GD.ZS", "rnd": "GB.XPD.RSDV.GD.ZS", "health": "SH.XPD.CHEX.GD.ZS", "military": "MS.MIL.XPND.GD.ZS", "mobile": "IT.CEL.SETS.P2", "tourism": "ST.INT.ARVL", "mktcap": "CM.MKT.LCAP.GD.ZS", "traded": "CM.MKT.TRAD.GD.ZS", "npl": "FB.AST.NPER.ZS", "hh_cons_pc": "NE.CON.PRVT.PC.KD", "urban": "SP.URB.TOTL.IN.ZS", "dep_ratio": "SP.POP.DPND", "gini": "SI.POV.GINI", "a_014": "SP.POP.0014.TO.ZS", "a_1564": "SP.POP.1564.TO.ZS", "a_65": "SP.POP.65UP.TO.ZS", "c_agri": "NV.AGR.TOTL.ZS", "c_ind": "NV.IND.TOTL.ZS", "c_srv": "NV.SRV.TOTL.ZS", "c_cons": "NE.CON.PRVT.ZS", "c_gov": "NE.CON.GOVT.ZS", "c_inv": "NE.GDI.TOTL.ZS", "c_exp": "NE.EXP.GNFS.ZS", "c_imp": "NE.IMP.GNFS.ZS"};
+const EXT = {"hdi": {"type": "owid", "slug": "human-development-index"}, "happy": {"type": "owid", "slug": "happiness-cantril-ladder"}, "bigmac": {"type": "bigmac", "slug": null}};
+const logEl=document.getElementById("log"), prog=document.getElementById("prog");
+function log(msg,cls){ const d=document.createElement("div"); if(cls)d.className=cls; d.textContent=msg; logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; }
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function wbGet(code,extra){
+  const r=await fetch(`https://api.worldbank.org/v2/country/all/indicator/${code}?format=json&per_page=20000&${extra}`);
+  const t=await r.text(); if(t.trim().startsWith("<")) throw new Error("xml");
+  const j=JSON.parse(t); return (Array.isArray(j)&&Array.isArray(j[1]))?j[1]:[];
+}
+function parseLatest(rows){ const best={}; for(const r of rows){ const a=r.countryiso3code; if(!a||a.length!==3||r.value==null) continue; const y=+r.date; if(!best[a]||y>best[a].y) best[a]={v:+r.value,y:String(r.date)}; } return best; }
+async function wbLatest(code){
+  for(let a=0;a<4;a++){ try{
+    let rows=await wbGet(code,"mrnev=1");
+    if(!rows.some(x=>x.value!=null)){ const y=new Date().getFullYear(); rows=await wbGet(code,"date="+(y-14)+":"+y); }
+    return parseLatest(rows);
+  }catch(e){ await sleep(700+a*500); } }
+  return {};
+}
+async function extLatest(e){
+  if(e.type==="owid"){
+    const t=await (await fetch(`https://ourworldindata.org/grapher/${e.slug}.csv?v=1&csvType=full&useColumnShortNames=false`)).text();
+    const best={}; const lines=t.split("\n");
+    for(let i=1;i<lines.length;i++){ const c=lines[i].split(","); const a=c[1],y=+c[2],v=+c[3];
+      if(a&&a.length===3&&!isNaN(y)&&c[3]!==""&&!isNaN(v)){ if(!best[a]||y>best[a].y) best[a]={v,y:String(y)}; } }
+    return best;
+  }
+  const t=await (await fetch("https://raw.githubusercontent.com/TheEconomist/big-mac-data/master/output-data/big-mac-full-index.csv")).text();
+  const lines=t.trim().split("\n"); const h=lines[0].split(","); const di=h.indexOf("date"),ii=h.indexOf("iso_a3"),ri=h.indexOf("USD_raw"); const best={};
+  for(let i=1;i<lines.length;i++){ const c=lines[i].split(","); const a=c[ii],date=c[di],v=+c[ri]*100; if(!a||a.length!==3||isNaN(v)||!date) continue; const y=+date.slice(0,4); if(!best[a]||y>best[a].y) best[a]={v,y:String(y)}; }
+  return best;
+}
+async function groupMeta(){ const j=await (await fetch("https://api.worldbank.org/v2/country?format=json&per_page=400")).json(); const gm={};
+  for(const c of (j[1]||[])){ if(!c.region||c.region.id==="NA") continue; gm[c.id]={regionId:c.region.id,region:(c.region.value||"").trim(),incomeId:c.incomeLevel.id,income:(c.incomeLevel.value||"").trim()}; } return gm; }
+
+async function build(){
+  document.getElementById("go").disabled=true;
+  const latest={}; const put=(k,map)=>{ for(const a in map){ (latest[a]=latest[a]||{})[k]=map[a]; } };
+  const wbKeys=Object.keys(WB), extKeys=Object.keys(EXT);
+  const total=wbKeys.length+extKeys.length+2; let done=0;
+  const tick=()=>{ done++; prog.style.width=Math.round(done/total*100)+"%"; };
+  log("Fetching "+wbKeys.length+" World Bank indicators…");
+  for(let i=0;i<wbKeys.length;i+=3){ const batch=wbKeys.slice(i,i+3);
+    const res=await Promise.all(batch.map(k=>wbLatest(WB[k])));
+    batch.forEach((k,j)=>{ const n=Object.keys(res[j]).length; put(k,res[j]); log("  "+k+": "+n+" countries", n?"ok":"warn"); tick(); });
+    await sleep(250);
+  }
+  log("Fetching external indices…");
+  for(const k of extKeys){ try{ const m=await extLatest(EXT[k]); put(k,m); log("  "+k+": "+Object.keys(m).length+" countries","ok"); }catch(e){ log("  "+k+": failed","warn"); } tick(); }
+  // computed misery
+  let mis=0; for(const a in latest){ const d=latest[a]; if(d.inflation&&d.unemployment){ d.misery={v:+(d.inflation.v+d.unemployment.v).toFixed(2), y:String(Math.max(+d.inflation.y,+d.unemployment.y))}; mis++; } }
+  log("  misery (computed): "+mis+" countries","ok"); tick();
+  log("Fetching region / income metadata…");
+  let gm={}; try{ gm=await groupMeta(); log("  groupMeta: "+Object.keys(gm).length+" countries","ok"); }catch(e){ log("  groupMeta: failed","warn"); } tick();
+  const snap={ generated:new Date().toISOString().slice(0,10), countries:Object.keys(latest).length, latest, groupMeta:gm };
+  const blob=new Blob([JSON.stringify(snap)],{type:"application/json"});
+  const kb=Math.round(blob.size/1024);
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="snapshot.json"; a.click();
+  prog.style.width="100%";
+  log("\n✅ Done — snapshot.json downloaded ("+snap.countries+" countries, "+kb+" KB).","ok");
+  log("Move it into your world-map-site folder (next to index.html), then: git add -A, git commit, git push.","ok");
+}
+document.getElementById("go").addEventListener("click",()=>build().catch(e=>log("Error: "+e.message,"warn")));
+</script></body></html>

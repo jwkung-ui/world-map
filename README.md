@@ -32,6 +32,25 @@ A single self-contained `index.html`. All data is fetched **client-side** at run
 
 There is **no backend and no build step** — it runs anywhere static files are served.
 
+## Fast loading — the data snapshot
+
+By default the app fetches ~45 live endpoints per visit, which is slow and can hit
+World Bank rate limits. To make it load instantly and scale to traffic, it will use a
+pre-built `snapshot.json` (every metric's latest value + region/income metadata in one
+file) if that file sits next to `index.html`. If the snapshot is absent, it falls back
+to live fetching automatically.
+
+To (re)build the snapshot — do this whenever you want to refresh the numbers:
+
+1. Make sure `index.html` and `build-snapshot.html` are pushed and live.
+2. Open `https://<your-username>.github.io/world-map/build-snapshot.html` and click
+   **Build snapshot.json** (takes ~1 minute; keep the tab focused). It downloads `snapshot.json`.
+3. Move `snapshot.json` into this folder (next to `index.html`), then `git add -A`,
+   `git commit -m "refresh snapshot"`, `git push`.
+
+The map + all tiles then load from that one static file (served off GitHub's CDN);
+trend lines still load live in the background. Re-run monthly or whenever you want fresh data.
+
 ## Run locally
 
 Just open `index.html` in a browser, or serve the folder:
