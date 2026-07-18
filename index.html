@@ -175,8 +175,13 @@
               <option value="gdp_growth">GDP growth</option>
               <option value="inflation">Inflation (CPI)</option>
               <option value="unemployment">Unemployment</option>
+              <option value="misery">Misery index (infl.+unemp.)</option>
               <option value="interest">Real interest rate</option>
               <option value="debt">Govt debt / GDP</option>
+              <option value="tax">Tax revenue / GDP</option>
+              <option value="cab">Current account / GDP</option>
+              <option value="trade">Trade / GDP</option>
+              <option value="remit">Remittances received / GDP</option>
               <option value="hh_cons_pc">Household spending / person</option>
             </optgroup>
             <optgroup label="Markets &amp; finance">
@@ -193,11 +198,22 @@
               <option value="life">Life expectancy</option>
               <option value="fertility">Fertility rate</option>
               <option value="internet">Internet users</option>
+              <option value="mobile">Mobile subscriptions</option>
+              <option value="health">Health spending / GDP</option>
+              <option value="rnd">R&amp;D spending / GDP</option>
             </optgroup>
             <optgroup label="Energy &amp; environment">
               <option value="elec_pc">Electricity use / person</option>
               <option value="elec_access">Electricity access</option>
               <option value="co2">CO₂ per capita</option>
+              <option value="renew">Renewable energy</option>
+            </optgroup>
+            <optgroup label="Society &amp; indices">
+              <option value="hdi">Human Development Index</option>
+              <option value="happy">World Happiness (0–10)</option>
+              <option value="bigmac">Big Mac index (vs USD)</option>
+              <option value="military">Military spending / GDP</option>
+              <option value="tourism">Tourist arrivals</option>
             </optgroup>
           </select>
         </div>
@@ -238,7 +254,7 @@
             <div class="loading" id="loading"><div class="spinner"></div><div id="loadingMsg">Loading map &amp; live data…</div></div>
             <div class="errbox" id="errbox"></div>
           </div>
-          <div class="note" id="mapNote">Data: World Bank Open Data · shapes: Natural Earth (world-atlas). Currency converted from international/US dollars at live market rates.</div>
+          <div class="note" id="mapNote">Data: World Bank Open Data; HDI &amp; Happiness via Our World in Data; Big Mac index via The Economist · shapes: Natural Earth. Each tile shows its exact source. Currency converted at live market rates.</div>
         </div>
       </section>
 
@@ -303,6 +319,23 @@
       co2:        { label:"CO₂ per capita",        wb:"EN.GHG.CO2.PC.CE.AR5", unit:"t per person", money:false, scale:"linear", fmt:fmtNum },
       elec_pc:    { label:"Electricity use / person", wb:"EG.USE.ELEC.KH.PC", unit:"kWh/person",     money:false, scale:"log",    fmt:fmtKwh },
       elec_access:{ label:"Electricity access",    wb:"EG.ELC.ACCS.ZS",      unit:"% of population",money:false, scale:"linear", fmt:fmtPct },
+      renew:      { label:"Renewable energy",      wb:"EG.FEC.RNEW.ZS",      unit:"% of final energy",money:false,scale:"linear", fmt:fmtPct },
+      // more economic / trade
+      tax:        { label:"Tax revenue / GDP",     wb:"GC.TAX.TOTL.GD.ZS",   unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      cab:        { label:"Current account / GDP", wb:"BN.CAB.XOKA.GD.ZS",   unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      trade:      { label:"Trade / GDP",           wb:"NE.TRD.GNFS.ZS",      unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      remit:      { label:"Remittances received",  wb:"BX.TRF.PWKR.DT.GD.ZS",unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      rnd:        { label:"R&D spending",          wb:"GB.XPD.RSDV.GD.ZS",   unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      health:     { label:"Health spending",       wb:"SH.XPD.CHEX.GD.ZS",   unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      military:   { label:"Military spending",     wb:"MS.MIL.XPND.GD.ZS",   unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
+      mobile:     { label:"Mobile subscriptions",  wb:"IT.CEL.SETS.P2",      unit:"per 100 people", money:false, scale:"linear", fmt:fmtNum },
+      tourism:    { label:"Tourist arrivals",      wb:"ST.INT.ARVL",         unit:"arrivals / year",money:false, scale:"log",    fmt:fmtPeople },
+      // computed index (no fetch — derived from two loaded metrics)
+      misery:     { label:"Misery index",          computed:{inputs:["inflation","unemployment"]}, unit:"inflation + unemployment", money:false, scale:"linear", fmt:fmtNum, index:true },
+      // external indices (fetched from OWID / The Economist, not the World Bank)
+      hdi:        { label:"Human Development Index",ext:{type:"owid", slug:"human-development-index"}, unit:"0–1 · higher = better", money:false, scale:"linear", fmt:fmtHDI, index:true },
+      happy:      { label:"World Happiness",        ext:{type:"owid", slug:"happiness-cantril-ladder"}, unit:"0–10 · higher = better", money:false, scale:"linear", fmt:fmtScore, index:true },
+      bigmac:     { label:"Big Mac index (vs USD)", ext:{type:"bigmac"}, unit:"% over / under-valued", money:false, scale:"linear", fmt:fmtPctSigned, index:true },
       // markets & finance
       mktcap:     { label:"Stock market cap / GDP", wb:"CM.MKT.LCAP.GD.ZS",  unit:"% of GDP",       money:false, scale:"linear", fmt:fmtPct },
       traded:     { label:"Stocks traded / GDP",   wb:"CM.MKT.TRAD.GD.ZS",   unit:"% of GDP · annual",money:false,scale:"linear", fmt:fmtPct },
@@ -326,7 +359,7 @@
       c_exp: {label:"Exports",     wb:"NE.EXP.GNFS.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true},
       c_imp: {label:"Imports",     wb:"NE.IMP.GNFS.ZS",unit:"% of GDP",money:false,scale:"linear",fmt:fmtPct,hidden:true}
     };
-    const METRIC_ORDER = ["gdp","income","gdp_growth","inflation","unemployment","interest","debt","hh_cons_pc","mktcap","traded","npl","pop","pop_growth","urban","dep_ratio","gini","life","fertility","internet","co2","elec_pc","elec_access"];
+    const METRIC_ORDER = ["gdp","income","gdp_growth","inflation","unemployment","misery","interest","debt","tax","cab","trade","remit","hh_cons_pc","mktcap","traded","npl","pop","pop_growth","urban","dep_ratio","gini","life","fertility","internet","mobile","health","rnd","co2","elec_pc","elec_access","renew","military","tourism","hdi","happy","bigmac"];
     const COMP = { sector:[["c_agri","Agriculture","#19c37d"],["c_ind","Industry","#7c5cff"],["c_srv","Services","#ffd166"]],
                    demand:[["c_cons","Household consumption","#7c5cff"],["c_inv","Investment","#19c37d"],["c_gov","Government","#ffd166"],["c_exp","Exports","#4aa3ff"],["c_imp","Imports","#ff8c6b"]] };
     const AGE = [["a_014","0–14","#4aa3ff"],["a_1564","15–64","#19c37d"],["a_65","65+","#ffd166"]];
@@ -392,6 +425,14 @@
     function fmtNum(n){ return n==null? "—" : n.toFixed(Math.abs(n)>=100?0:1); }
     function fmtKwh(n){ return n==null? "—" : new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(Math.round(n))+" kWh"; }
     function fmtUSD0(n){ return n==null? "—" : "$"+new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(Math.round(n)); }
+    function fmtHDI(n){ return n==null? "—" : n.toFixed(3); }
+    function fmtScore(n){ return n==null? "—" : n.toFixed(2); }
+    function fmtPctSigned(n){ return n==null? "—" : (n>=0?"+":"")+Math.round(n)+"%"; }
+    function srcLabel(m){
+      if(m.computed) return "Computed · inflation + unemployment";
+      if(m.ext) return m.ext.type==="bigmac" ? "The Economist · Big Mac index" : "Our World in Data";
+      return "World Bank · "+m.wb;
+    }
     function curRate(){ return state.fx[state.currency] || 1; }
     function curMeta(){ return CURRENCIES.find(c=>c[0]===state.currency) || ["USD","$"]; }
     function fmtMoney(nUsd){ if(nUsd==null) return "—"; const v=nUsd*curRate(); const sym=curMeta()[1];
@@ -406,7 +447,8 @@
       selectedA3:null, selectedFeat:null,
       benchGroup:"world",        // world | region | income
       groupMeta:{},              // a3 -> {regionId, region, incomeId, income}
-      aggSeries:{}               // metricKey -> { a3: [{y,v}] }  (all-country series, cached, for benchmark line)
+      aggSeries:{},              // metricKey -> { a3: [{y,v}] }  (all-country series, cached, for benchmark line)
+      extRaw:{}                  // metricKey -> [{a3,y,v}]  (cached non-World-Bank datasets: OWID, Big Mac)
     };
     let features=[], path, svg, g, zoom, colorScale=()=>"#2a3350", markersSel=null, mapW=0, mapH=0;
     // Notable small economies / city-states that are ~sub-pixel polygons; always get a marker.
@@ -445,9 +487,46 @@
       let i=0; const n=Math.min(limit, items.length);
       await Promise.all(Array.from({length:n}, async ()=>{ while(i<items.length){ const idx=i++; await fn(items[idx], idx); } }));
     }
+    // ---- Non-World-Bank datasets (OWID grapher CSV / The Economist Big Mac) ----
+    // fetched once at runtime, cached; parsed to a flat [{a3,y,v}] we can slice like WB data.
+    async function loadExt(key){
+      if(state.extRaw[key]) return state.extRaw[key];
+      const ext=METRICS[key].ext; const rows=[];
+      try{
+        if(ext.type==="owid"){
+          const url=`https://ourworldindata.org/grapher/${ext.slug}.csv?v=1&csvType=full&useColumnShortNames=false`;
+          const t=await (await fetch(url)).text(); const lines=t.split("\n");
+          for(let i=1;i<lines.length;i++){ const c=lines[i].split(","); const a3=c[1], y=+c[2], v=+c[3];
+            if(a3 && a3.length===3 && !isNaN(y) && c[3]!=="" && !isNaN(v)) rows.push({a3,y,v}); }
+        } else if(ext.type==="bigmac"){
+          const t=await (await fetch("https://raw.githubusercontent.com/TheEconomist/big-mac-data/master/output-data/big-mac-full-index.csv")).text();
+          const lines=t.trim().split("\n"); const h=lines[0].split(","); const di=h.indexOf("date"), ii=h.indexOf("iso_a3"), ri=h.indexOf("USD_raw");
+          const seen={};   // keep the latest date within each (country, year)
+          for(let i=1;i<lines.length;i++){ const c=lines[i].split(","); const a3=c[ii], date=c[di], v=+c[ri]*100;
+            if(!a3 || a3.length!==3 || isNaN(v) || !date) continue; const y=+date.slice(0,4); const kk=a3+"|"+y;
+            if(!seen[kk] || date>seen[kk].date) seen[kk]={a3,y,v,date}; }
+          for(const o of Object.values(seen)) rows.push({a3:o.a3,y:o.y,v:o.v});
+        }
+      }catch(e){ /* leave empty; metric just shows no data */ }
+      state.extRaw[key]=rows; return rows;
+    }
+    function extLatest(rows){ const best={}; for(const r of rows){ if(!best[r.a3] || r.y>best[r.a3].y) best[r.a3]={v:r.v, y:String(r.y)}; } return best; }
+    // compute a derived metric (e.g. Misery = inflation + unemployment) into a dataset that already holds its inputs
+    function computeDerivedInto(target, key){
+      const inputs=METRICS[key].computed.inputs;
+      for(const a3 in target){ const d=target[a3]; let ok=true, sum=0, y=0;
+        for(const inp of inputs){ const r=d[inp]; if(!r || r.v==null){ ok=false; break; } sum+=r.v; y=Math.max(y, +r.y||0); }
+        if(ok) d[key]={v:sum, y:String(y||"")}; }
+    }
     async function loadMetricLatest(key){
       if(state.loadedLatest.has(key)) return;
-      const code=METRICS[key].wb;
+      const M=METRICS[key];
+      if(M.computed){ for(const inp of M.computed.inputs) await loadMetricLatest(inp);
+        computeDerivedInto(state.latest, key); state.loadedLatest.add(key); return; }
+      if(M.ext){ const best=extLatest(await loadExt(key));
+        for(const a3 in best){ (state.latest[a3]=state.latest[a3]||{})[key]=best[a3]; }
+        state.loadedLatest.add(key); return; }
+      const code=M.wb;
       // primary: "most recent value per country" (one row each)
       try{ const rows=await wbFetch("all", code, "mrnev=1");
         if(rows && rows.some(r=>r && r.value!=null)){ ingestInto(state.latest,key,rows); state.loadedLatest.add(key); return; }
@@ -465,7 +544,14 @@
     async function loadYear(y){
       if(state.byYear[y]) return state.byYear[y];
       const target={}; state.byYear[y]=target;
-      await runLimited(LOAD_KEYS, 3, async k=>{ try{ const rows=await wbFetch("all", METRICS[k].wb, "date="+y); ingestInto(target,k,rows); }catch(e){} });
+      // World Bank metrics for the year
+      await runLimited(LOAD_KEYS.filter(k=>!METRICS[k].computed && !METRICS[k].ext), 3,
+        async k=>{ try{ const rows=await wbFetch("all", METRICS[k].wb, "date="+y); ingestInto(target,k,rows); }catch(e){} });
+      // external datasets sliced to that year
+      for(const k of LOAD_KEYS){ if(!METRICS[k].ext) continue; const rows=await loadExt(k);
+        for(const r of rows){ if(r.y===+y) (target[r.a3]=target[r.a3]||{})[k]={v:r.v, y:String(r.y)}; } }
+      // derived metrics after inputs are in place
+      for(const k of LOAD_KEYS){ if(METRICS[k].computed) computeDerivedInto(target, k); }
       return target;
     }
     async function loadFX(){
@@ -531,7 +617,8 @@
       const mine=recOf(a3,key); if(!mine||mine.v==null) return null;
       const g=groupLabel(a3,group); const parts=[];
       if(b.pctl!=null){ const top=100-b.pctl; parts.push(top<=50 ? "top "+Math.max(top,1)+"%" : "bottom "+Math.max(b.pctl,1)+"%"); }
-      if(METRICS[key].agg!=="sum"){
+      if(METRICS[key].index){ /* score/rank: percentile only; tile still shows the group average value */ }
+      else if(METRICS[key].agg!=="sum"){
         if(isPctMetric(key)){ const d=mine.v-b.value; parts.push((d>=0?"+":"")+d.toFixed(1)+" pts vs "+g); }
         else if(b.value>0){ const ratio=mine.v/b.value; parts.push((ratio>=1?ratio.toFixed(ratio>=10?0:1)+"× ":(1/ratio).toFixed(1)+"× below ")+g); }
       }
@@ -540,7 +627,18 @@
     // benchmark trend series (pop-weighted per year, using latest pop as fixed weights)
     async function loadAggSeries(key){
       if(state.aggSeries[key]) return state.aggSeries[key];
-      try{ const rows=await wbFetch("all", METRICS[key].wb, "date=1965:2025");
+      const M=METRICS[key];
+      if(M.ext){ const rows=await loadExt(key); const by={};
+        for(const r of rows){ (by[r.a3]=by[r.a3]||[]).push({y:r.y, v:r.v}); }
+        for(const a in by) by[a].sort((x,y)=>x.y-y.y); state.aggSeries[key]=by; return by; }
+      if(M.computed){ const parts=await Promise.all(M.computed.inputs.map(loadAggSeries)); if(parts.some(p=>!p)){ return null; }
+        const by={}; const countries=new Set(); parts.forEach(p=>Object.keys(p).forEach(c=>countries.add(c)));
+        for(const c of countries){ const maps=parts.map(p=>{ const m={}; (p[c]||[]).forEach(d=>m[d.y]=d.v); return m; });
+          const yrs=new Set(); parts.forEach(p=>(p[c]||[]).forEach(d=>yrs.add(d.y)));
+          const arr=[]; for(const y of yrs){ let ok=true,s=0; for(const m of maps){ if(m[y]==null){ok=false;break;} s+=m[y]; } if(ok) arr.push({y,v:s}); }
+          if(arr.length) by[c]=arr.sort((a,b)=>a.y-b.y); }
+        state.aggSeries[key]=by; return by; }
+      try{ const rows=await wbFetch("all", M.wb, "date=1965:2025");
         const by={}; for(const r of rows){ const a=r.countryiso3code; if(!a||a.length!==3||r.value==null) continue; (by[a]=by[a]||[]).push({y:+r.date, v:+r.value}); }
         for(const a in by) by[a].sort((x,y)=>x.y-y.y);
         state.aggSeries[key]=by; return by;
@@ -562,7 +660,8 @@
     // ---- Colour scale (domain in BASE USD; currency only affects labels) ----
     function buildColorScale(){
       const m=METRICS[state.metric], ds=dataset(), vals=[];
-      for(const a3 in ds){ const r=ds[a3][state.metric]; if(r && r.v>0) vals.push(r.v); }
+      for(const a3 in ds){ const r=ds[a3][state.metric]; if(!r || r.v==null) continue;
+        if(m.scale==="log"){ if(r.v>0) vals.push(r.v); } else vals.push(r.v); }   // linear scales keep negatives (Big Mac, growth, current account)
       vals.sort((a,b)=>a-b);
       if(!vals.length){ colorScale=()=>"#2a3350"; return {lo:0,mid:0,hi:0}; }
       const q=p=>vals[Math.min(vals.length-1,Math.max(0,Math.floor(p*(vals.length-1))))];
@@ -692,7 +791,7 @@
         div.innerHTML=`<p class="k">${m.label}${m.money?" ("+state.currency+")":""}</p>
           ${valHtml}
           ${benchHtml}
-          <div class="src">World Bank · ${m.wb}</div>
+          <div class="src">${srcLabel(m)}</div>
           <div class="spark" data-k="${key}"></div>`;
         grid.appendChild(div); sparkHolders[key]=div.querySelector(".spark");
       }
@@ -744,7 +843,17 @@
     async function loadSeriesOne(a3, key){
       state.seriesCache[a3]=state.seriesCache[a3]||{};
       if(state.seriesCache[a3][key]!==undefined) return state.seriesCache[a3][key];
-      try{ const rows=await wbFetch(a3, METRICS[key].wb, "date=1965:2025");
+      const M=METRICS[key];
+      if(M.ext){ const rows=await loadExt(key);
+        const s=rows.filter(r=>r.a3===a3).map(r=>({y:r.y, v:r.v})).sort((a,b)=>a.y-b.y);
+        state.seriesCache[a3][key]=s; return s; }
+      if(M.computed){ const parts=await Promise.all(M.computed.inputs.map(inp=>loadSeriesOne(a3, inp)));
+        if(parts.some(p=>!p)){ state.seriesCache[a3][key]=[]; return []; }
+        const maps=parts.map(p=>{ const m={}; p.forEach(d=>m[d.y]=d.v); return m; });
+        const yrs=new Set(); parts.forEach(p=>p.forEach(d=>yrs.add(d.y)));
+        const s=[]; for(const y of [...yrs].sort((a,b)=>a-b)){ let ok=true,sum=0; for(const m of maps){ if(m[y]==null){ok=false;break;} sum+=m[y]; } if(ok) s.push({y,v:sum}); }
+        state.seriesCache[a3][key]=s; return s; }
+      try{ const rows=await wbFetch(a3, M.wb, "date=1965:2025");
         const s=rows.filter(x=>x.value!=null).map(x=>({y:+x.date, v:+x.value})).sort((a,b)=>a.y-b.y);
         state.seriesCache[a3][key]=s; return s;
       }catch(e){ return null; }
